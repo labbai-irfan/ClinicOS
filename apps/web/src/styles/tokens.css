@@ -1,0 +1,97 @@
+/*
+  ClinicOS design tokens. Values are R G B triplets (no commas) so Tailwind can
+  apply opacity via `rgb(var(--x) / <alpha-value>)`. Calm medical blue + teal,
+  accessible status colors — see spec §30.
+*/
+:root {
+  --background: 248 250 252;
+  --surface: 255 255 255;
+  --surface-muted: 241 245 249;
+  --border: 226 232 240;
+  --text-primary: 15 23 42;
+  --text-secondary: 71 85 105;
+
+  --primary: 15 92 140;
+  --primary-hover: 12 74 114;
+  --primary-foreground: 255 255 255;
+
+  --secondary: 13 148 136;
+  --secondary-foreground: 255 255 255;
+
+  --success: 22 130 79;
+  --warning: 161 98 7;
+  --danger: 190 42 42;
+  --info: 30 108 179;
+
+  --focus-ring: 15 92 140;
+
+  --radius-sm: 6px;
+  --radius: 10px;
+  --radius-lg: 16px;
+
+  --shadow-card: 0 1px 2px rgba(15, 23, 42, 0.06), 0 1px 3px rgba(15, 23, 42, 0.08);
+  --shadow-popover: 0 8px 24px rgba(15, 23, 42, 0.14);
+}
+
+:root[data-theme='dark'] {
+  --background: 8 13 22;
+  --surface: 15 23 36;
+  --surface-muted: 22 32 48;
+  --border: 40 52 71;
+  --text-primary: 241 245 249;
+  --text-secondary: 148 163 184;
+
+  --primary: 56 152 204;
+  --primary-hover: 79 168 216;
+  --primary-foreground: 8 13 22;
+
+  --secondary: 45 190 176;
+  --secondary-foreground: 8 13 22;
+
+  --success: 74 199 141;
+  --warning: 214 158 46;
+  --danger: 235 100 100;
+  --info: 96 170 230;
+
+  --focus-ring: 96 170 230;
+
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4), 0 1px 3px rgba(0, 0, 0, 0.5);
+  --shadow-popover: 0 8px 24px rgba(0, 0, 0, 0.5);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --background: 8 13 22;
+    --surface: 15 23 36;
+    --surface-muted: 22 32 48;
+    --border: 40 52 71;
+    --text-primary: 241 245 249;
+    --text-secondary: 148 163 184;
+
+    --primary: 56 152 204;
+    --primary-hover: 79 168 216;
+    --primary-foreground: 8 13 22;
+
+    --secondary: 45 190 176;
+    --secondary-foreground: 8 13 22;
+
+    --success: 74 199 141;
+    --warning: 214 158 46;
+    --danger: 235 100 100;
+    --info: 96 170 230;
+
+    --focus-ring: 96 170 230;
+
+    --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4), 0 1px 3px rgba(0, 0, 0, 0.5);
+    --shadow-popover: 0 8px 24px rgba(0, 0, 0, 0.5);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}

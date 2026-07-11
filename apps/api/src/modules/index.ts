@@ -1,0 +1,37 @@
+import { Router } from 'express';
+import { authRoutes } from './auth/auth.routes';
+import { patientRoutes } from './patients/patient.routes';
+import { appointmentRoutes } from './appointments/appointment.routes';
+import { queueRoutes } from './queues/queue.routes';
+import { emergencyRoutes } from './emergencies/emergency.routes';
+import { nurseAssessmentRoutes } from './nurse-assessments/nurse-assessment.routes';
+import { vitalsRoutes } from './vitals/vitals.routes';
+import { consultationRoutes } from './consultations/consultation.routes';
+import { prescriptionRoutes } from './prescriptions/prescription.routes';
+import { billingRoutes } from './billing/billing.routes';
+import { documentRoutes } from './documents/document.routes';
+import { notificationRoutes } from './notifications/notification.routes';
+import { dashboardRoutes } from './dashboards/dashboard.routes';
+import { analyticsRoutes } from './analytics/analytics.routes';
+import { auditLogRoutes } from './audit-logs/audit-log.routes';
+import { settingsRoutes } from './settings/settings.routes';
+
+/** Central API v1 route registry (spec §38). Modules never self-mount. */
+export const apiV1 = Router();
+
+apiV1.use('/auth', authRoutes);
+apiV1.use('/patients', patientRoutes);
+apiV1.use('/appointments', appointmentRoutes);
+apiV1.use('/queues', queueRoutes);
+apiV1.use('/emergencies', emergencyRoutes);
+apiV1.use('/nurse-assessments', nurseAssessmentRoutes);
+apiV1.use('/vitals', vitalsRoutes);
+apiV1.use('/consultations', consultationRoutes);
+apiV1.use('/prescriptions', prescriptionRoutes);
+apiV1.use('/billing', billingRoutes);
+apiV1.use('/documents', documentRoutes);
+apiV1.use('/notifications', notificationRoutes);
+apiV1.use('/dashboard', dashboardRoutes);
+apiV1.use('/analytics', analyticsRoutes);
+apiV1.use('/audit-logs', auditLogRoutes);
+apiV1.use('/settings', settingsRoutes);
