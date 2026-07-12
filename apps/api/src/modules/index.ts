@@ -1,13 +1,17 @@
 import { Router } from 'express';
 import { authRoutes } from './auth/auth.routes';
+import { patientAuthRoutes } from './auth/patient.routes';
 import { patientRoutes } from './patients/patient.routes';
+import { patientPatientRoutes } from './patients/patient-patient.routes';
 import { appointmentRoutes } from './appointments/appointment.routes';
+import { patientAppointmentRoutes } from './appointments/patient-appointments.routes';
 import { queueRoutes } from './queues/queue.routes';
 import { emergencyRoutes } from './emergencies/emergency.routes';
 import { nurseAssessmentRoutes } from './nurse-assessments/nurse-assessment.routes';
 import { vitalsRoutes } from './vitals/vitals.routes';
 import { consultationRoutes } from './consultations/consultation.routes';
 import { prescriptionRoutes } from './prescriptions/prescription.routes';
+import { patientPrescriptionRoutes } from './prescriptions/patient-prescriptions.routes';
 import { billingRoutes } from './billing/billing.routes';
 import { documentRoutes } from './documents/document.routes';
 import { notificationRoutes } from './notifications/notification.routes';
@@ -25,13 +29,24 @@ import { scheduleRoutes } from './schedules/schedule.routes';
 export const apiV1 = Router();
 
 apiV1.use('/auth', authRoutes);
-apiV1.use('/patients', patientRoutes);
+
+// Patient Portal Routes (mounted at /api/v1/patient)
+apiV1.use('/patient/auth', patientAuthRoutes);
+apiV1.use('/patient', patientPatientRoutes);
+apiV1.use('/patient/appointments', patientAppointmentRoutes);
+apiV1.use('/patient/prescriptions', patientPrescriptionRoutes);
+
+// Staff/Clinic Routes
+apiV1.use('/appointments/patient', patientAppointmentRoutes);
 apiV1.use('/appointments', appointmentRoutes);
+apiV1.use('/patients/patient', patientPatientRoutes);
+apiV1.use('/patients', patientRoutes);
 apiV1.use('/queues', queueRoutes);
 apiV1.use('/emergencies', emergencyRoutes);
 apiV1.use('/nurse-assessments', nurseAssessmentRoutes);
 apiV1.use('/vitals', vitalsRoutes);
 apiV1.use('/consultations', consultationRoutes);
+apiV1.use('/prescriptions/patient', patientPrescriptionRoutes);
 apiV1.use('/prescriptions', prescriptionRoutes);
 apiV1.use('/billing', billingRoutes);
 apiV1.use('/documents', documentRoutes);

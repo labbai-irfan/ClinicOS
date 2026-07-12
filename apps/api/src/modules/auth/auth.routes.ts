@@ -9,6 +9,7 @@ import {
 import { authenticate, authRateLimit, validate } from '../../middleware';
 import { asyncHandler } from '../../shared/http';
 import * as controller from './auth.controller';
+import { patientAuthRoutes } from './patient.routes';
 
 export const authRoutes = Router();
 
@@ -42,3 +43,6 @@ authRoutes.post(
   asyncHandler(controller.changePassword),
 );
 authRoutes.get('/sessions', authenticate, asyncHandler(controller.sessions));
+
+// Patient authentication routes
+authRoutes.use(patientAuthRoutes);

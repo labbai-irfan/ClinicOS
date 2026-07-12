@@ -312,3 +312,41 @@ export async function changeAppointmentStatus(
 
   return toDto(doc);
 }
+
+/**
+ * List appointments for a specific patient (patient-facing endpoint).
+ * Filters by patient ID and respects date/status filters.
+ */
+export async function listPatientAppointments(
+  req: Request,
+  patientId: Types.ObjectId,
+  filters: { dateFrom?: string; dateTo?: string; status?: string },
+  pagination: Pagination,
+): Promise<{ items: AppointmentDto[]; total: number }> {
+  const filter: FilterQuery<AppointmentDoc> = { ...tenantFilter(req), patientId, deletedAt: null };
+
+  if (filters.dateFrom && filters.dateTo) {
+    filter.date = {
+      $gte: filters.dateFrom,
+      $lte: filters.dateTo,
+    };
+  } else if (filters.dateFrom) {
+    filter.date = { $gte: filters.dateFrom };
+  } else if (filters.dateTo) {
+    filter.date = { $lte: filters.dateTo };
+  }
+
+  if (filters.status) {
+    filter.status = filters.status;
+  }
+
+  const [docs, total] = await Promise.all([
+    AppointmentModel.find(filter)
+      .sort({ date: 1, windowStart: 1 })
+      .skip(pagination.skip)
+      .limit(pagination.limit),
+    AppointmentModel.countDocuments(filter),
+  ]);
+
+  return { items: docs.map(toDto), total };
+}

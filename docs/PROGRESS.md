@@ -1,6 +1,28 @@
 # ClinicOS — Progress
 
-_Last updated: 2026-07-12 (session 3 — Phase 2 M1 completion)_
+_Last updated: 2026-07-13 (session 4 — Phase 2 M2 completion)_
+
+## ✅ COMPLETED — Phase 2 Milestone 2: Patient Portal
+
+### Scope: Standalone patient-facing app for self-service booking, prescriptions, and profile
+- **New app**: `apps/patient-web` — separate Vite/React app, same design system as staff `apps/web`, deployable independently
+- **28 new backend tests** (11 auth + 17 data endpoints) — all passing
+- **197/197 tests total** (169 from Phase 1 + M1, + 28 new) — 100% pass
+- **100% typecheck** across api + patient-web; production build verified
+
+### Backend — Patient Auth & Data Endpoints
+- `POST /api/v1/patient/auth/register-patient`, `login-patient`, `refresh-patient` — patient is a `User` with `role=patient`, no clinic membership required
+- `GET /api/v1/patient/appointments/me`, `POST /api/v1/patient/appointments/book` — booking reuses the same double-booking/capacity validation as staff
+- `GET /api/v1/patient/prescriptions/me`, `GET /api/v1/patient/prescriptions/:id`, download via signed PDF URL
+- `GET /api/v1/patient/me` (profile), `GET /api/v1/patient/branches`, `GET /api/v1/patient/doctors`, `GET /api/v1/patient/available-slots`
+- Routes ordered specific-before-general so patient auth isn't caught by the authenticated `/patient` router
+
+### Frontend — `apps/patient-web`
+- Pages: Login, Register, Dashboard (upcoming appointments + active prescriptions), Appointments (filterable), Book Appointment (clinic→branch→doctor→date→time with live slot picker), Prescriptions (list + download), Prescription Detail, Profile
+- Own Zustand auth store + API client + router, isolated from the staff app but sharing `@clinicos/types`/`@clinicos/validation` and the Tailwind design tokens (incl. dark mode)
+
+### Process Note
+Building this with a background workflow surfaced a real orchestration bug: the Integration stage's task prompt asked an agent to start `npm run dev:api` as part of a "smoke test," but dev servers never exit — every attempt hung and was silently retried (4 times) instead of completing. Fixed by rewriting that stage to do static verification only (route-wiring check, typecheck, `vitest run`, production build) — all commands that terminate on their own. Resumed from the cached build stages so no rework was needed.
 
 ## ✅ COMPLETED — Phase 1 Core Build
 
