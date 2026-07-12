@@ -15,12 +15,15 @@ export interface ClinicRecord extends ClinicDto {
  *  branding (step 7), both persisted directly on the Clinic document. */
 export type UpdateClinicInput = Partial<ClinicIdentityInput> & Partial<PrescriptionBrandingInput>;
 
-/** Body accepted by PATCH /settings/clinic (steps 5 and 6). No shared DTO/schema exists
- *  for the clinic settings resource yet, so the shape is kept local to this feature. */
+/** Body accepted by PATCH /settings/clinic (step 6 — appointment window/buffer +
+ *  rejoin policy). Field names must match `updateClinicSettingsSchema` on the
+ *  backend exactly (packages/validation/src/tenancy.ts); unknown keys are
+ *  silently stripped there rather than rejected, so a mismatch here loses data
+ *  silently. There is no clinic-wide "default consultation fee" field on this
+ *  (or any) resource — fees are per-doctor (see ConsultationFeeStep). */
 export interface UpdateClinicSettingsInput {
-  defaultConsultationFeePaise?: number;
   appointmentWindowMinutes?: number;
-  bufferMinutes?: number;
+  appointmentBufferMinutes?: number;
   rejoinPolicy?: RejoinPolicy;
 }
 

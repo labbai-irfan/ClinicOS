@@ -166,7 +166,17 @@ export default function RolesPage() {
                             <span className="ml-2 font-mono text-xs text-text-secondary">{permission}</span>
                           </td>
                           {clinicRoles.map((role) => {
-                            const disabled = !canManage || role.isSystem || updatePermissions.isPending;
+                            // System roles ARE editable (the backend seeds every clinic role with
+                            // isSystem: true — that only protects renaming/deletion, not permissions;
+                            // see role.service.ts updateRole). The one true restriction is the clinic
+                            // owner role, whose permissions can never be reduced below the full set —
+                            // lock only the boxes that are currently checked for that role so the
+                            // owner column never drops below all-permissions, matching the 409 the
+                            // backend would otherwise return.
+                            const isLockedOwnerPermission =
+                              role.key === 'clinic_owner' && isChecked(role.id, permission);
+                            const disabled =
+                              !canManage || updatePermissions.isPending || isLockedOwnerPermission;
                             return (
                               <td key={role.id} className="px-3 py-2 text-center">
                                 <input
@@ -207,13 +217,13 @@ export default function RolesPage() {
                 (() => {
                   const role = rolesById.get(mobileRoleId);
                   if (!role) return null;
-                  const disabled = !canManage || role.isSystem || updatePermissions.isPending;
+                  const isOwnerRole = role.key === 'clinic_owner';
                   return (
                     <>
-                      {role.isSystem && (
+                      {isOwnerRole && (
                         <p className="flex items-center gap-1.5 text-xs text-text-secondary">
                           <Lock className="h-3.5 w-3.5" aria-hidden="true" />
-                          System role — permissions cannot be changed here.
+                          The clinic owner role always keeps every permission.
                         </p>
                       )}
                       {GROUPS.map(([group, permissions]) => (
@@ -222,21 +232,27 @@ export default function RolesPage() {
                             <CardTitle className="text-sm">{permissionGroupLabel(group)}</CardTitle>
                           </CardHeader>
                           <CardContent className="space-y-2">
-                            {permissions.map((permission) => (
-                              <label
-                                key={permission}
-                                className="flex min-h-[36px] items-center gap-2 text-sm text-text-primary"
-                              >
-                                <input
-                                  type="checkbox"
-                                  className="h-5 w-5 rounded border-border disabled:opacity-40"
-                                  checked={isChecked(role.id, permission)}
-                                  disabled={disabled}
-                                  onChange={() => toggle(role.id, permission)}
-                                />
-                                {permissionActionLabel(permission)}
-                              </label>
-                            ))}
+                            {permissions.map((permission) => {
+                              const disabled =
+                                !canManage ||
+                                updatePermissions.isPending ||
+                                (isOwnerRole && isChecked(role.id, permission));
+                              return (
+                                <label
+                                  key={permission}
+                                  className="flex min-h-[36px] items-center gap-2 text-sm text-text-primary"
+                                >
+                                  <input
+                                    type="checkbox"
+                                    className="h-5 w-5 rounded border-border disabled:opacity-40"
+                                    checked={isChecked(role.id, permission)}
+                                    disabled={disabled}
+                                    onChange={() => toggle(role.id, permission)}
+                                  />
+                                  {permissionActionLabel(permission)}
+                                </label>
+                              );
+                            })}
                           </CardContent>
                         </Card>
                       ))}

@@ -22,6 +22,7 @@ export interface BranchDoc {
   workingHours: WorkingHour[];
   announcement?: string;
   isActive: boolean;
+  deletedAt?: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -48,8 +49,11 @@ const branchSchema = new Schema<BranchDoc>(
     ],
     announcement: String,
     isActive: { type: Boolean, default: true },
+    deletedAt: { type: Date, default: null },
   },
   { collection: 'branches', timestamps: true },
 );
+
+branchSchema.index({ clinicId: 1, isActive: 1 });
 
 export const BranchModel = model<BranchDoc>('Branch', branchSchema);

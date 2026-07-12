@@ -22,8 +22,8 @@ import { usePermission } from '../../../hooks/use-permission';
 import { toast } from '../../../components/ui/Toast';
 import { apiErrorMessage } from '../../../lib/api-client';
 import {
-  clinicIdentitySchema,
   tokenSettingsSchema,
+  updateClinicSchema,
   updateClinicSettingsSchema,
   useBranchesQuery,
   useClinicQuery,
@@ -32,8 +32,8 @@ import {
   useUpdateClinicMutation,
   useUpdateClinicSettingsMutation,
   useUpdateTokenSettingsMutation,
-  type ClinicIdentityInput,
   type TokenSettingsInput,
+  type UpdateClinicInput,
   type UpdateClinicSettingsInput,
 } from '../api';
 import { BranchEditDialog } from '../components/BranchEditDialog';
@@ -60,8 +60,8 @@ function ClinicIdentitySection({ canManage }: { canManage: boolean }) {
     handleSubmit,
     reset,
     formState: { errors, isDirty, isSubmitting },
-  } = useForm<ClinicIdentityInput>({
-    resolver: zodResolver(clinicIdentitySchema),
+  } = useForm<UpdateClinicInput>({
+    resolver: zodResolver(updateClinicSchema),
     defaultValues: { name: '', phone: '', email: '', timezone: 'Asia/Kolkata' },
   });
 

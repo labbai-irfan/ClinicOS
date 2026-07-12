@@ -98,7 +98,17 @@ export function InviteStaffDialog({
     };
     try {
       const staff = await inviteStaff.mutateAsync(payload);
-      toast.success('Invitation sent', `${staff.name} will receive sign-in instructions by email.`);
+      // No outbound invite email exists yet — when the server generated a one-time
+      // password (no temporaryPassword was set above), it's only ever returned this
+      // once. Surface it so the admin has a way to hand it to the new staffer.
+      if (staff.temporaryPassword) {
+        toast.success(
+          'Invitation created',
+          `${staff.name}'s temporary password is: ${staff.temporaryPassword} — share it with them securely; it will not be shown again.`,
+        );
+      } else {
+        toast.success('Invitation sent', `${staff.name} can sign in with the password you set.`);
+      }
       onInvited?.(staff);
       close();
     } catch (err) {

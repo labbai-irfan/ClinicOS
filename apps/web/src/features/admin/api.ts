@@ -19,6 +19,7 @@ import {
   doctorScheduleSchema,
   inviteStaffSchema,
   tokenSettingsSchema,
+  updateClinicSchema,
   updateClinicSettingsSchema,
   type DoctorScheduleInput,
   type InviteStaffInput,
@@ -40,6 +41,7 @@ export {
   doctorScheduleSchema,
   doctorLeaveSchema,
   tokenSettingsSchema,
+  updateClinicSchema,
   updateClinicSettingsSchema,
 };
 
@@ -336,10 +338,7 @@ export function useClinicQuery() {
   });
 }
 
-export type UpdateClinicInput = Partial<ClinicIdentityInput> & {
-  prescriptionHeader?: string;
-  prescriptionFooter?: string;
-};
+export type UpdateClinicInput = z.infer<typeof updateClinicSchema>;
 
 export function useUpdateClinicMutation() {
   const queryClient = useQueryClient();

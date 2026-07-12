@@ -18,6 +18,8 @@ import { tenantFilter } from '../../middleware/tenant';
 import type { Pagination } from '../../shared/pagination';
 import { audit } from '../../shared/audit';
 import { ConflictError, InvalidTransitionError, NotFoundError, UnauthenticatedError, ValidationError } from '../../shared/errors';
+import { DoctorScheduleModel } from '../schedules/schedule.model';
+import { expandDoctorIds } from '../schedules/schedule.service';
 import { AppointmentModel, type AppointmentDoc } from './appointment.model';
 
 export type CreateAppointmentInput = z.infer<typeof createAppointmentSchema>;
@@ -26,11 +28,14 @@ export type AppointmentStatusInput = z.infer<typeof appointmentStatusSchema>;
 export type AppointmentListFilters = z.infer<typeof appointmentListQuery>;
 
 /**
- * Reasonable default per-slot capacity used when a doctor-schedule lookup for the
- * exact slot is not conveniently available. A future schedule.service can replace
- * this with a per-doctor configured value (spec §13).
+ * Conservative fallback per-slot capacity used only when the doctor has no
+ * schedule configured for this branch yet. schedule.service.getAvailableSlots
+ * also refuses to offer any slots at all until a schedule exists, so treating an
+ * unconfigured doctor as single-booking-only here keeps the booking guard at
+ * least as strict as what the availability grid would ever advertise. Once a
+ * schedule exists, `resolveSlotCapacity` uses its real `maxPerWindow` instead.
  */
-const DEFAULT_SLOT_CAPACITY = 4;
+const DEFAULT_SLOT_CAPACITY = 1;
 
 /** Statuses that no longer occupy a doctor's calendar for capacity purposes. */
 const INACTIVE_STATUSES = new Set(['cancelled', 'no_show']);
@@ -75,39 +80,64 @@ interface CapacityCheckInput {
 }
 
 /**
- * Double-booking guard (spec §13): rejects when either (a) the exact doctor/date/
- * windowStart slot has reached the default capacity, or (b) the requested window
- * genuinely overlaps another active appointment for the same doctor. Overridable
- * only when the caller passed overrideCapacity AND holds APPOINTMENT_OVERRIDE —
- * checked here (not via authorize()) because the permission is conditional, not
- * required for every create/reschedule call.
+ * The doctor's configured per-window capacity for this branch/date (schedule.service
+ * getAvailableSlots computes availability the same way) — falls back to the generic
+ * default when no schedule has been configured yet for this doctor+branch.
+ */
+async function resolveSlotCapacity(
+  clinicId: Types.ObjectId,
+  branchId: Types.ObjectId,
+  doctorIds: Types.ObjectId[],
+): Promise<number> {
+  const schedule = await DoctorScheduleModel.findOne({
+    clinicId,
+    branchId,
+    doctorId: { $in: doctorIds },
+    deletedAt: null,
+  })
+    .select({ maxPerWindow: 1 })
+    .lean();
+  return schedule ? Math.max(schedule.maxPerWindow, 1) : DEFAULT_SLOT_CAPACITY;
+}
+
+/**
+ * Double-booking guard (spec §13): rejects when either (a) the requested window at
+ * this branch already has `capacity` overlapping active appointments for the same
+ * doctor — capacity comes from the doctor's configured schedule (schedule.service
+ * getAvailableSlots reports the exact same number, so a slot advertised as
+ * available is never then rejected here) — or (b) the doctor already has an
+ * overlapping active appointment at a DIFFERENT branch, which is always a
+ * conflict regardless of capacity (one person cannot be in two places). Doctor
+ * identity is resolved the same way the schedule module does (staff-profile id or
+ * user id both refer to the same doctor). Overridable only when the caller passed
+ * overrideCapacity AND holds APPOINTMENT_OVERRIDE — checked here (not via
+ * authorize()) because the permission is conditional, not required for every
+ * create/reschedule call.
  */
 async function assertNoDoubleBooking(req: Request, input: CapacityCheckInput): Promise<void> {
   const tenant = requireTenant(req);
-  const doctorId = new Types.ObjectId(input.doctorId);
+  const doctorIds = await expandDoctorIds({ clinicId: tenant.clinicId }, input.doctorId);
 
-  const baseFilter: FilterQuery<AppointmentDoc> = {
+  const overlapFilter: FilterQuery<AppointmentDoc> = {
     clinicId: tenant.clinicId,
-    branchId: tenant.branchId,
-    doctorId,
+    doctorId: { $in: doctorIds },
     date: input.date,
     status: { $nin: [...INACTIVE_STATUSES] },
     deletedAt: null,
+    windowStart: { $lt: input.windowEnd },
+    windowEnd: { $gt: input.windowStart },
   };
   if (input.excludeId) {
-    baseFilter._id = { $ne: input.excludeId };
+    overlapFilter._id = { $ne: input.excludeId };
   }
 
-  const [sameSlotCount, overlapping] = await Promise.all([
-    AppointmentModel.countDocuments({ ...baseFilter, windowStart: input.windowStart }),
-    AppointmentModel.exists({
-      ...baseFilter,
-      windowStart: { $lt: input.windowEnd },
-      windowEnd: { $gt: input.windowStart },
-    }),
+  const [capacity, sameBranchOverlapCount, crossBranchConflict] = await Promise.all([
+    resolveSlotCapacity(tenant.clinicId, tenant.branchId, doctorIds),
+    AppointmentModel.countDocuments({ ...overlapFilter, branchId: tenant.branchId }),
+    AppointmentModel.exists({ ...overlapFilter, branchId: { $ne: tenant.branchId } }),
   ]);
 
-  const isDoubleBooking = sameSlotCount >= DEFAULT_SLOT_CAPACITY || Boolean(overlapping);
+  const isDoubleBooking = sameBranchOverlapCount >= capacity || Boolean(crossBranchConflict);
   if (!isDoubleBooking) return;
 
   const canOverride =
@@ -115,7 +145,9 @@ async function assertNoDoubleBooking(req: Request, input: CapacityCheckInput): P
   if (canOverride) return;
 
   throw new ConflictError(
-    'This doctor is already fully booked for the selected time slot. Choose another slot or request an override.',
+    crossBranchConflict
+      ? 'This doctor already has an appointment at another branch during this time.'
+      : 'This doctor is already fully booked for the selected time slot. Choose another slot or request an override.',
     ERROR_CODES.DOUBLE_BOOKING,
   );
 }

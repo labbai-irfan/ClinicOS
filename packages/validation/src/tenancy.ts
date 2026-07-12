@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { ROLE_KEYS, WEEKDAYS } from '@clinicos/types';
-import { mobileNumber, nonEmptyText, objectId, optionalText, timeHHmm } from './common';
+import { nonEmptyText, objectId, optionalMobileNumber, optionalText, timeHHmm } from './common';
 
 export const workingHoursSchema = z.array(
   z.object({
@@ -11,11 +11,26 @@ export const workingHoursSchema = z.array(
   }),
 );
 
+/**
+ * True when `Intl` can construct a `DateTimeFormat` for the given zone. Node's ICU
+ * throws `RangeError` for anything that is not a valid IANA identifier — the exact
+ * check `shared/dates.ts` relies on at slot-computation time, so an invalid value
+ * must never reach the database.
+ */
+function isValidIanaTimezone(tz: string): boolean {
+  try {
+    new Intl.DateTimeFormat('en-US', { timeZone: tz });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export const clinicIdentitySchema = z.object({
   name: nonEmptyText(160),
-  phone: mobileNumber.optional(),
+  phone: optionalMobileNumber,
   email: z.string().trim().toLowerCase().email().optional(),
-  timezone: z.string().default('Asia/Kolkata'),
+  timezone: z.string().default('Asia/Kolkata').refine(isValidIanaTimezone, 'Enter a valid IANA timezone (e.g. Asia/Kolkata).'),
 });
 
 export const branchSchema = z.object({
@@ -25,14 +40,14 @@ export const branchSchema = z.object({
   city: optionalText(80),
   state: optionalText(80),
   postalCode: optionalText(12),
-  phone: mobileNumber.optional(),
+  phone: optionalMobileNumber,
   workingHours: workingHoursSchema.optional(),
 });
 
 export const inviteStaffSchema = z.object({
   name: nonEmptyText(120),
   email: z.string().trim().toLowerCase().email(),
-  phone: mobileNumber.optional(),
+  phone: optionalMobileNumber,
   roleKey: z.enum(ROLE_KEYS).exclude(['super_admin', 'patient']),
   branchIds: z.array(objectId).min(1, 'Assign at least one branch'),
   specialization: optionalText(120),

@@ -93,6 +93,13 @@ export interface StaffDto {
   followUpFeePaise?: number;
   avgConsultationMinutes?: number;
   isActive: boolean;
+  /**
+   * Only ever present in the response to POST /staff (invite), and only when the
+   * caller did not supply their own `temporaryPassword` — the server-generated
+   * one-time password, returned exactly once so the admin can hand it to the new
+   * staffer (there is no outbound invite email yet). Never returned by GET/PATCH.
+   */
+  temporaryPassword?: string;
 }
 
 export interface PatientAlertDto {

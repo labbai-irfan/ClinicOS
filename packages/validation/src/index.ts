@@ -9,3 +9,8 @@ export * from './clinical';
 export * from './billing';
 export * from './document';
 export * from './notification';
+export * from './clinic';
+export * from './branch';
+export * from './staff';
+export * from './role';
+export * from './schedule';

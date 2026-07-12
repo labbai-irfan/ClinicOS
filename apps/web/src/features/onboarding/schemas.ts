@@ -28,16 +28,23 @@ export type AddressContactInput = z.infer<typeof addressContactSchema>;
 export const workingHoursFormSchema = z.object({ workingHours: workingHoursSchema });
 export type WorkingHoursFormInput = z.infer<typeof workingHoursFormSchema>;
 
-/** Step 5: clinic-wide default consultation fee. */
+/**
+ * Step 5: clinic-wide default consultation fee. There is no backend field for a
+ * clinic-wide default yet (fees live per-doctor on staff profiles, spec §9) — this
+ * schema is kept for the wizard's own client-side form validation only; nothing
+ * here is sent to PATCH /settings/clinic (see ConsultationFeeStep).
+ */
 export const consultationFeeSchema = z.object({
   defaultConsultationFeePaise: amountPaise,
 });
 export type ConsultationFeeInput = z.infer<typeof consultationFeeSchema>;
 
-/** Step 6: appointment window/buffer + queue rejoin policy. */
+/** Step 6: appointment window/buffer + queue rejoin policy. Field names must match
+ *  `updateClinicSettingsSchema` (PATCH /settings/clinic) exactly — unknown keys are
+ *  silently stripped by the backend's non-strict zod object. */
 export const queueRulesSchema = z.object({
   appointmentWindowMinutes: z.number().int().min(5).max(120),
-  bufferMinutes: z.number().int().min(0).max(60),
+  appointmentBufferMinutes: z.number().int().min(0).max(60),
   rejoinPolicy: rejoinPolicySchema,
 });
 export type QueueRulesInput = z.infer<typeof queueRulesSchema>;

@@ -15,6 +15,11 @@ import { dashboardRoutes } from './dashboards/dashboard.routes';
 import { analyticsRoutes } from './analytics/analytics.routes';
 import { auditLogRoutes } from './audit-logs/audit-log.routes';
 import { settingsRoutes } from './settings/settings.routes';
+import { clinicRoutes } from './clinics/clinic.routes';
+import { branchRoutes } from './branches/branch.routes';
+import { staffRoutes } from './staff/staff.routes';
+import { roleRoutes } from './roles/role.routes';
+import { scheduleRoutes } from './schedules/schedule.routes';
 
 /** Central API v1 route registry (spec §38). Modules never self-mount. */
 export const apiV1 = Router();
@@ -35,3 +40,8 @@ apiV1.use('/dashboard', dashboardRoutes);
 apiV1.use('/analytics', analyticsRoutes);
 apiV1.use('/audit-logs', auditLogRoutes);
 apiV1.use('/settings', settingsRoutes);
+apiV1.use('/clinics', clinicRoutes);
+apiV1.use('/branches', branchRoutes);
+apiV1.use('/staff', staffRoutes);
+apiV1.use('/roles', roleRoutes);
+apiV1.use('/schedules', scheduleRoutes);

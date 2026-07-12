@@ -82,7 +82,16 @@ export function StaffInviteForm({ fixedRoleKey, branchId, onInvited }: StaffInvi
       });
       setInvited((prev) => [...prev, staff]);
       onInvited?.(staff);
-      toast.success('Invitation sent', `${staff.name} will receive sign-in instructions by email.`);
+      // No outbound invite email exists yet — this one-time password is only ever
+      // returned in this response, so surface it for the admin to share.
+      if (staff.temporaryPassword) {
+        toast.success(
+          'Invitation created',
+          `${staff.name}'s temporary password is: ${staff.temporaryPassword} — share it with them securely.`,
+        );
+      } else {
+        toast.success('Invitation sent', `${staff.name} added.`);
+      }
       reset({
         ...EMPTY_INVITE_DEFAULTS,
         roleKey: fixedRoleKey ?? 'receptionist',

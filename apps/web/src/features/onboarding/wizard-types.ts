@@ -12,7 +12,7 @@ export interface WizardSummary {
   doctorsInvited?: number;
   consultationFeePaise?: number;
   appointmentWindowMinutes?: number;
-  bufferMinutes?: number;
+  appointmentBufferMinutes?: number;
   rejoinPolicy?: RejoinPolicy;
   prescriptionHeader?: string;
   prescriptionFooter?: string;

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { Types } from 'mongoose';
+import request from 'supertest';
 import { createTestClinic, authed } from '../../test/helpers';
 
 function newPatientId(): string {
@@ -53,6 +54,95 @@ describe('appointments module', () => {
     const second = await client.post('/api/v1/appointments').send({ ...body, patientId: newPatientId() });
     expect(second.status).toBe(409);
     expect(second.body.error.code).toBe('DOUBLE_BOOKING');
+  });
+
+  it('honors the doctor schedule maxPerWindow instead of a fixed default (matches available-slots)', async () => {
+    const clinic = await createTestClinic();
+    const admin = authed(clinic.app, clinic.tokens.clinic_admin);
+    const receptionist = authed(clinic.app, clinic.tokens.receptionist);
+    const doctorId = clinic.userIds.doctor.toString();
+
+    await admin.post('/api/v1/schedules').send({
+      doctorId,
+      branchId: clinic.branchId.toString(),
+      weekly: [{ day: 'monday', sessions: [{ start: '09:00', end: '10:00' }] }],
+      slotMinutes: 20,
+      bufferMinutes: 10,
+      maxPerWindow: 2,
+      walkInCapacityPerDay: 30,
+    });
+
+    const body = {
+      doctorId,
+      date: '2026-08-10', // Monday
+      windowStart: '09:00',
+      windowEnd: '09:20',
+      type: 'new' as const,
+    };
+
+    // available-slots would report capacity:2 for this window — booking up to that
+    // capacity must succeed, not be rejected on the first overlap like before.
+    const first = await receptionist
+      .post('/api/v1/appointments')
+      .send({ ...body, patientId: newPatientId() });
+    expect(first.status).toBe(201);
+
+    const second = await receptionist
+      .post('/api/v1/appointments')
+      .send({ ...body, patientId: newPatientId() });
+    expect(second.status).toBe(201);
+
+    // The third booking exceeds maxPerWindow=2 and is correctly rejected.
+    const third = await receptionist
+      .post('/api/v1/appointments')
+      .send({ ...body, patientId: newPatientId() });
+    expect(third.status).toBe(409);
+    expect(third.body.error.code).toBe('DOUBLE_BOOKING');
+
+    const slots = await receptionist.get(
+      `/api/v1/schedules/available-slots?doctorId=${doctorId}&date=2026-08-10`,
+    );
+    expect(slots.body.data[0]).toMatchObject({ capacity: 2, bookedCount: 2, available: false });
+  });
+
+  it('blocks a doctor from being double-booked across two different branches', async () => {
+    const clinic = await createTestClinic();
+    const owner = authed(clinic.app, clinic.tokens.clinic_owner);
+    const receptionist = authed(clinic.app, clinic.tokens.receptionist);
+    const doctorId = clinic.userIds.doctor.toString();
+
+    const branchB = await owner.post('/api/v1/branches').send({ name: 'Branch B' });
+    const branchBId = branchB.body.data.id as string;
+
+    // Grant the receptionist access to both branches so they can switch context.
+    const staffList = await owner.get('/api/v1/staff?roleKey=receptionist');
+    const receptionistStaffId = staffList.body.data[0].id as string;
+    await owner
+      .patch(`/api/v1/staff/${receptionistStaffId}`)
+      .send({ branchIds: [clinic.branchId.toString(), branchBId] });
+
+    const bookAtBranch = (branchId: string, patientId: string) =>
+      request(clinic.app)
+        .post('/api/v1/appointments')
+        .set('Authorization', `Bearer ${clinic.tokens.receptionist}`)
+        .set('x-branch-id', branchId)
+        .send({
+          patientId,
+          doctorId,
+          date: '2026-08-20',
+          windowStart: '09:00',
+          windowEnd: '09:20',
+          type: 'new',
+        });
+
+    const atBranchA = await bookAtBranch(clinic.branchId.toString(), newPatientId());
+    expect(atBranchA.status).toBe(201);
+
+    // Same doctor, same time, a different branch — must never be allowed regardless
+    // of that branch's own capacity configuration.
+    const atBranchB = await bookAtBranch(branchBId, newPatientId());
+    expect(atBranchB.status).toBe(409);
+    expect(atBranchB.body.error.code).toBe('DOUBLE_BOOKING');
   });
 
   it('allows a double-booking when overrideCapacity is set and the actor has APPOINTMENT_OVERRIDE', async () => {

@@ -19,6 +19,14 @@ export const mobileNumber = z
   .trim()
   .regex(/^\+?[0-9\s-]{7,15}$/, 'Enter a valid mobile number');
 
+/**
+ * Optional mobile number that also accepts an empty string as "not provided".
+ * Forms that reset an untouched phone field to `''` (the common React Hook Form
+ * default) must not fail validation on a field the user never touched — use this
+ * instead of `mobileNumber.optional()` wherever the field is genuinely optional.
+ */
+export const optionalMobileNumber = mobileNumber.optional().or(z.literal('').transform(() => undefined));
+
 export const nonEmptyText = (max = 200) => z.string().trim().min(1, 'Required').max(max);
 
 export const optionalText = (max = 2000) =>

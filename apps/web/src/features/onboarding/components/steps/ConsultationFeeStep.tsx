@@ -4,8 +4,6 @@ import { z } from 'zod';
 import { CardContent, CardDescription, CardHeader, CardTitle } from '../../../../components/ui/Card';
 import { Input } from '../../../../components/ui/Input';
 import { Field } from '../../../../components/ui/Field';
-import { apiErrorMessage } from '../../../../lib/api-client';
-import { useUpdateClinicSettingsMutation } from '../../api';
 import { StepFooter } from '../StepFooter';
 
 /** Rupee amount as typed by the user; converted to integer paise on submit. */
@@ -20,26 +18,23 @@ interface ConsultationFeeStepProps {
 }
 
 export function ConsultationFeeStep({ onBack, onComplete }: ConsultationFeeStepProps) {
-  const updateSettings = useUpdateClinicSettingsMutation();
-
   const {
     register,
     handleSubmit,
-    setError,
     formState: { errors, isSubmitting },
   } = useForm<FeeFormInput>({
     resolver: zodResolver(feeFormSchema),
     defaultValues: { feeRupees: 500 },
   });
 
-  const onSubmit = handleSubmit(async (values) => {
+  // There is no clinic-wide "default consultation fee" field on the backend — fees
+  // are set per doctor on their staff profile (spec §9, see InviteStaffDialog /
+  // StaffInviteForm). This step is display/review-only (wizard summary + guidance
+  // for the fee the admin will set per doctor); it must not call PATCH
+  // /settings/clinic, whose schema has no matching field and would silently drop it.
+  const onSubmit = handleSubmit((values) => {
     const defaultConsultationFeePaise = Math.round(values.feeRupees * 100);
-    try {
-      await updateSettings.mutateAsync({ defaultConsultationFeePaise });
-      onComplete({ consultationFeePaise: defaultConsultationFeePaise });
-    } catch (err) {
-      setError('root', { message: apiErrorMessage(err, 'Could not save the consultation fee.') });
-    }
+    onComplete({ consultationFeePaise: defaultConsultationFeePaise });
   });
 
   return (
@@ -70,14 +65,9 @@ export function ConsultationFeeStep({ onBack, onComplete }: ConsultationFeeStepP
           />
         </Field>
 
-        {errors.root?.message && (
-          <p role="alert" className="text-sm text-danger">
-            {errors.root.message}
-          </p>
-        )}
       </CardContent>
       <div className="px-4 pb-4 sm:px-5 sm:pb-5">
-        <StepFooter onBack={onBack} loading={isSubmitting || updateSettings.isPending} />
+        <StepFooter onBack={onBack} loading={isSubmitting} />
       </div>
     </form>
   );

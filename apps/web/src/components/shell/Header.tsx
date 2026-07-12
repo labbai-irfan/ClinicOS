@@ -1,14 +1,18 @@
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
-import { Bell, Menu, Plus, LogOut, User, Settings } from 'lucide-react';
+import { Bell, Menu, Plus, LogOut, User, Settings, Sun, Moon, MonitorSmartphone } from 'lucide-react';
 import { format } from 'date-fns';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../stores/auth-store';
 import { useLogoutMutation } from '../../features/auth/api';
 import { usePermission } from '../../hooks/use-permission';
 import { useUnreadNotificationCountQuery } from '../../features/notifications/api';
+import { useThemeToggle } from '../../hooks/use-theme';
 import { PERMISSIONS } from '@clinicos/types';
 import { IconButton } from '../ui/Tooltip';
 import { cn } from '../../lib/utils';
+
+const THEME_ICON = { system: MonitorSmartphone, light: Sun, dark: Moon } as const;
+const THEME_LABEL = { system: 'System theme (click for light)', light: 'Light theme (click for dark)', dark: 'Dark theme (click for system)' } as const;
 
 export function Header({ onOpenMobileNav }: { onOpenMobileNav: () => void }) {
   const user = useAuthStore((s) => s.user);
@@ -17,6 +21,7 @@ export function Header({ onOpenMobileNav }: { onOpenMobileNav: () => void }) {
   const { has } = usePermission();
   const canViewNotifications = has(PERMISSIONS.NOTIFICATION_READ);
   const { data: unreadCount } = useUnreadNotificationCountQuery(canViewNotifications);
+  const { theme, cycleTheme } = useThemeToggle();
 
   return (
     <header className="sticky top-0 z-30 flex h-16 items-center gap-3 border-b border-border bg-surface px-4">
@@ -42,6 +47,8 @@ export function Header({ onOpenMobileNav }: { onOpenMobileNav: () => void }) {
             Add Walk-In
           </Link>
         )}
+
+        <IconButton label={THEME_LABEL[theme]} icon={THEME_ICON[theme]} onClick={cycleTheme} />
 
         <div className="relative">
           <IconButton

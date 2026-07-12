@@ -4,8 +4,11 @@ import { queryClient } from './lib/query-client';
 import { router } from './router';
 import { TooltipProvider } from './components/ui/Tooltip';
 import { Toaster } from './components/ui/Toast';
+import { useThemeEffect } from './hooks/use-theme';
 
 export function App() {
+  useThemeEffect();
+
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>

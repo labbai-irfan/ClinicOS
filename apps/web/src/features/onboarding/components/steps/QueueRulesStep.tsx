@@ -42,7 +42,7 @@ export function QueueRulesStep({ onBack, onComplete }: QueueRulesStepProps) {
     resolver: zodResolver(queueRulesSchema),
     defaultValues: {
       appointmentWindowMinutes: DEFAULTS.APPOINTMENT_WINDOW_MINUTES,
-      bufferMinutes: DEFAULTS.APPOINTMENT_BUFFER_MINUTES,
+      appointmentBufferMinutes: DEFAULTS.APPOINTMENT_BUFFER_MINUTES,
       rejoinPolicy: DEFAULTS.REJOIN_POLICY,
     },
   });
@@ -86,15 +86,15 @@ export function QueueRulesStep({ onBack, onComplete }: QueueRulesStepProps) {
             label="Buffer between slots (minutes)"
             htmlFor="buffer-minutes"
             required
-            error={errors.bufferMinutes?.message}
+            error={errors.appointmentBufferMinutes?.message}
           >
             <Input
               id="buffer-minutes"
               type="number"
               min={0}
               max={60}
-              invalid={!!errors.bufferMinutes}
-              {...register('bufferMinutes', { valueAsNumber: true })}
+              invalid={!!errors.appointmentBufferMinutes}
+              {...register('appointmentBufferMinutes', { valueAsNumber: true })}
             />
           </Field>
         </div>

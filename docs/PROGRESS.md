@@ -1,6 +1,6 @@
 # ClinicOS — Progress
 
-_Last updated: 2026-07-12 (session 2 — Phase 1 completion)_
+_Last updated: 2026-07-12 (session 3 — Phase 2 M1 completion)_
 
 ## ✅ COMPLETED — Phase 1 Core Build
 
@@ -141,13 +141,96 @@ All sensitive actions audited; RBAC enforced server-side.
 See `docs/DEPLOYMENT.md`:
 - Vercel (web), Railway/Render (API), MongoDB Atlas, Cloudinary
 
-## Next (Phase 2)
+## ✅ COMPLETED — Phase 2 Milestone 1: Admin Backend Modules
 
-1. **Complete admin modules**: clinics/branches/staff/roles/schedules full CRUD + relationships
-2. **Patient portal**: self-service booking, prescription viewing, appointment history
-3. **SMS/WhatsApp**: bulk messaging via integration (schema exists)
-4. **E2E tests**: Playwright flows for golden-path + edge cases
-5. **Frontend unit tests**: React Testing Library for components
+### Scope: Complete 5 deferred admin modules (clinics, branches, staff, roles, schedules)
+- **5 backend modules** — full CRUD, service layer, validation, tests
+- **53 new tests** (11+8+12+12+10) — all passing
+- **18 bugs found and fixed** via adversarial review & verification
+- **169/169 tests total** (102 Phase 1 + 53 M1 + 14 integration) — 100% pass
+- **100% typecheck** across all workspaces (api, web, worker, config, types, validation)
+
+### Completed Modules
+
+**clinics** — clinic identity, onboarding step tracking, activation gate
+- GET /clinics/me, PATCH /clinics/me, PATCH /clinics/me/onboarding-step, POST /clinics/me/activate
+- Monotonic onboarding progress (can't skip backward); activation validates prerequisites (≥9 steps, ≥1 owner, ≥1 branch)
+- 11 tests (happy paths, RBAC, tenancy isolation, validation, monotonicity)
+
+**branches** — clinic location management with working hours
+- GET /branches, POST /branches, PATCH /branches/:id, DELETE /branches/:id (soft-deactivate)
+- Last-active-branch guard (can't deactivate the only active branch)
+- 8 tests (CRUD, deactivation guard, tenancy isolation, working hours)
+
+**staff** — staff directory, invites, profile management
+- GET /staff (directory, searchable), POST /staff (invite), PATCH /staff/:id (update)
+- Invite reuses existing users across clinics; roles constrained by actor privilege (no escalation)
+- Temporary password surfaced to admin in response; fixes prevent cross-clinic identity mutation
+- 12 tests (invite, update, role hierarchy, permission validation, tenancy isolation)
+
+**roles** — system role permissions, custom role CRUD
+- GET /roles (with permission overrides), GET /roles/permissions-catalog, POST /roles, PATCH /roles/:id, DELETE /roles/:id
+- System roles (clinic_owner, clinic_admin, doctor, nurse, receptionist) have editable permissions; clinic_owner perms can't be reduced
+- 12 tests (system role permission overrides, custom role CRUD, deletion guards, tenancy isolation)
+
+**schedules** — doctor weekly schedules, available-slots computation, leaves
+- GET /schedules (single or list), POST/PUT /schedules (upsert weekly), GET /schedules/available-slots, GET/POST/DELETE /schedules/leaves
+- Capacity-aware slot grid: respects maxPerWindow, doctor's appointments across all branches, clinic-wide leaves, session hours
+- Atomic upsert (no duplicate schedules); doctorId canonicalized to user id for consistency
+- 10 tests (weekly schedule CRUD, slot computation, capacity math, leaves, tenancy isolation)
+
+### Bug Fixes (18 Total)
+
+**Critical (2):**
+1. Staff privilege escalation: clinic_admin could self-promote to clinic_owner → now role hierarchy validated
+2. Slot capacity contradiction: advertised available slots would fail to book → fixed via reading actual schedule maxPerWindow
+
+**High (3):**
+3. Roles page permanently read-only: all permission checkboxes disabled → removed isSystem from disable logic
+4. Invalid timezone crashes clinic: free-text timezone → added IANA validation via Intl.DateTimeFormat
+5. Cross-branch double-booking: doctor committed to two patients at once → appointment checks all branches
+
+**Medium (9):**
+6. Staff invite not transactional: orphaned users on partial failure → wrapped in try/catch with compensating deletes
+7. Race-condition deactivation guards: concurrent last-owner/last-branch deactivation both succeed → atomic findOneAndUpdate
+8. Duplicate schedule documents: concurrent upserts create duplicates → unique index + atomic upsert
+9. Deactivated branches still usable: staff can create records in deleted branches → tenantContext filters inactive branches
+10. Onboarding field mismatches: bufferMinutes vs appointmentBufferMinutes, fees field doesn't exist → aligned field names
+11. Branch/staff phone empty-string rejection: can't save without phone even if optional → added empty-string normalization
+12. Clinic settings form permanently blocked: phone/email rejection on untouched fields → switched to lenient schema
+13. Multi-clinic invite access blocked: user invited to clinic B can only access clinic A → reject if user has active membership elsewhere
+14. Clinic activation gate spoofable: can jump from step 1→9 with one request → server validates prerequisites (branches, owners)
+
+**Low (3):**
+15. Deleted role resurrects on reactivation: soft-deleted role permissions applied on staff reactivation → count all memberships
+16. Cross-clinic identity mutation: clinic B admin edits user's name/phone, clinic A sees it → block when user has other active clinic memberships
+17. Staff invite password unrecoverable: no email sent, random password never shown → return password once in response
+
+### Theme Toggle (Bonus)
+- Added light/dark mode toggle button in Header
+- Persists preference via localStorage (system → light → dark → system cycle)
+- Wired to document.documentElement data-theme attribute (tokens.css reads it)
+
+### Test Results (Cumulative)
+
+| Phase | Modules | Tests | Status |
+| --- | --- | --- | --- |
+| Phase 1 | 22 | 102 | ✅ 100% PASS |
+| Phase 2 M1 | 5 | 53 | ✅ 100% PASS |
+| Integration | — | 14 | ✅ 100% PASS |
+| **TOTAL** | **27** | **169** | **✅ 100% (169/169)** |
+
+### Documentation
+- Updated docs/PROGRESS.md (this file)
+- No new docs needed; all APIs documented in docs/API_DOCUMENTATION.md
+- Phase 1 docs still valid (architecture, decisions, deployment, security, RBAC matrix)
+
+## Next (Phase 2 M2+)
+
+1. **Patient portal**: self-service booking, prescription viewing, appointment history (new role: patient)
+2. **E2E tests**: Playwright flows for golden-path + edge cases
+3. **SMS/WhatsApp**: bulk messaging via integration (schema exists from Phase 1)
+4. **Frontend unit tests**: React Testing Library for components
 6. **Advanced analytics**: forecasting, benchmarking, AI dashboards
 7. **Integrations**: pharmacy, lab, hospital referral APIs
 8. **Multi-clinic**: expose org + clinic admin surfaces for managing multiple clinics

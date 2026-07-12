@@ -72,7 +72,7 @@ export function ReviewActivateStep({ clinic, summary, onBack, onActivated }: Rev
             label="Appointment window"
             value={
               summary.appointmentWindowMinutes !== undefined
-                ? `${summary.appointmentWindowMinutes} min (+${summary.bufferMinutes ?? 0} min buffer)`
+                ? `${summary.appointmentWindowMinutes} min (+${summary.appointmentBufferMinutes ?? 0} min buffer)`
                 : undefined
             }
           />
