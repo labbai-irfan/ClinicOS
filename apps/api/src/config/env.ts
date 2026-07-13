@@ -20,6 +20,8 @@ const envSchema = z.object({
   AUTH_RATE_LIMIT_MAX: z.coerce.number().int().default(10),
   LOCKOUT_MAX_ATTEMPTS: z.coerce.number().int().default(5),
   LOCKOUT_DURATION_MINUTES: z.coerce.number().int().default(15),
+  /** Hours before an appointment's start time to send the SMS/WhatsApp reminder (apps/worker). */
+  APPOINTMENT_REMINDER_HOURS_BEFORE: z.coerce.number().min(0).default(3),
 });
 
 const parsed = envSchema.safeParse(process.env);

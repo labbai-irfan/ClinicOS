@@ -1,6 +1,7 @@
 import { Queue, Worker, type Job } from 'bullmq';
 import IORedis from 'ioredis';
 import { logger } from './logger';
+import { handleAppointmentReminder } from './handlers/appointment-reminder';
 
 const REDIS_URL = process.env.REDIS_URL;
 
@@ -28,6 +29,8 @@ async function main(): Promise<void> {
       logger.info({ job: job.name, id: job.id }, 'processing job');
       switch (job.name) {
         case 'appointment-reminder':
+          await handleAppointmentReminder(job.data as { appointmentId: string });
+          break;
         case 'follow-up-reminder':
         case 'prescription-pdf':
         case 'report-generation':

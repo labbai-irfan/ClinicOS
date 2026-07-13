@@ -239,6 +239,45 @@ CLOUDINARY_API_SECRET=
 
 ---
 
+## Twilio (SMS/WhatsApp Appointment Reminders)
+
+```
+TWILIO_ACCOUNT_SID=
+TWILIO_AUTH_TOKEN=
+TWILIO_SMS_FROM=
+TWILIO_WHATSAPP_FROM=
+APPOINTMENT_REMINDER_CHANNEL=sms
+APPOINTMENT_REMINDER_HOURS_BEFORE=3
+```
+
+- **What**: Sends patients an SMS or WhatsApp reminder before their appointment
+- **Needs**: `REDIS_URL` configured (see [Redis](#redis-optional-background-jobs) above) AND `apps/worker` running — reminders are scheduled by the API but sent by the worker process
+- **For local dev**: Optional entirely
+  - If `TWILIO_ACCOUNT_SID`/`TWILIO_AUTH_TOKEN` are blank: reminder jobs still get scheduled and picked up by the worker, but the send is logged and dropped (visible in the worker's logs and in the `messageLogs` collection with `status: 'failed'`)
+  - Core app (booking, queue, billing, etc.) is completely unaffected either way
+
+- **To enable**:
+
+  1. **Create a free Twilio account**: https://www.twilio.com/try-twilio
+  2. **Get your Account SID and Auth Token**: shown on the Twilio Console dashboard (https://console.twilio.com) right after signup
+  3. **Get an SMS-capable phone number**: Console → Phone Numbers → Buy a number (trial accounts get a free number; SMS to Indian numbers may need A2P/DLT registration outside the trial — see Twilio's India compliance docs)
+  4. **Set SMS variables**:
+     ```
+     TWILIO_ACCOUNT_SID=ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+     TWILIO_AUTH_TOKEN=your_auth_token_here
+     TWILIO_SMS_FROM=+15017122661
+     ```
+  5. **(Optional) Enable WhatsApp**: Console → Messaging → Try it out → Send a WhatsApp message gives you a **sandbox number** (e.g. `whatsapp:+14155238886`) for testing — the recipient must first send the sandbox's join code from their own WhatsApp before they can receive messages from it. A production WhatsApp sender requires Twilio's WhatsApp Business Profile approval process (separate from the SMS number).
+     ```
+     TWILIO_WHATSAPP_FROM=whatsapp:+14155238886
+     APPOINTMENT_REMINDER_CHANNEL=whatsapp
+     ```
+  6. **Verify**: Book an appointment less than `APPOINTMENT_REMINDER_HOURS_BEFORE` hours out won't send anything (too late, skipped by design); book one further out, then check the worker's logs around the scheduled reminder time (or query the `messageLogs` collection directly) for `status: 'sent'`
+
+- **For local dev without SMS/WhatsApp**: Leave all four blank — this is the default, nothing to do
+
+---
+
 ## Rate Limiting
 
 ```
@@ -318,6 +357,9 @@ CLOUDINARY_CLOUD_NAME=
 CLOUDINARY_API_KEY=
 CLOUDINARY_API_SECRET=
 
+# Appointment reminders (needs REDIS_URL above and apps/worker running)
+APPOINTMENT_REMINDER_HOURS_BEFORE=3
+
 # Rate limiting
 RATE_LIMIT_WINDOW_MS=60000
 RATE_LIMIT_MAX=300
@@ -334,6 +376,15 @@ VITE_API_URL=http://localhost:4000
 # ========== PATIENT PORTAL (apps/patient-web) ==========
 
 VITE_API_URL=http://localhost:4000
+
+# ========== WORKER (apps/worker) ==========
+
+# Twilio (optional — leave blank to skip; reminders logged and dropped)
+TWILIO_ACCOUNT_SID=
+TWILIO_AUTH_TOKEN=
+TWILIO_SMS_FROM=
+TWILIO_WHATSAPP_FROM=
+APPOINTMENT_REMINDER_CHANNEL=sms
 ```
 
 ---
@@ -376,6 +427,7 @@ If any step fails, check the error message and re-read the relevant section abov
 | "Cannot find module @clinicos/types" | Run `npm install` at repo root to install all dependencies |
 | "Port 4000 already in use" | Change PORT to an available port (e.g., 4001) |
 | "Redis connection refused" | Redis not running; either start it or comment out REDIS_URL in .env |
+| Appointment reminders never arrive | Check three things in order: (1) REDIS_URL is set and Redis is running, (2) `apps/worker` is actually running (`npm run dev:worker`), (3) TWILIO_ACCOUNT_SID/AUTH_TOKEN/SMS_FROM (or WHATSAPP_FROM) are set — check the worker's logs or the `messageLogs` collection for the specific failure reason |
 
 ---
 

@@ -18,6 +18,8 @@ import { tenantFilter } from '../../middleware/tenant';
 import type { Pagination } from '../../shared/pagination';
 import { audit } from '../../shared/audit';
 import { ConflictError, InvalidTransitionError, NotFoundError, UnauthenticatedError, ValidationError } from '../../shared/errors';
+import { enqueueJob, cancelJob } from '../../shared/jobs';
+import { env } from '../../config/env';
 import { DoctorScheduleModel } from '../schedules/schedule.model';
 import { expandDoctorIds } from '../schedules/schedule.service';
 import { AppointmentModel, type AppointmentDoc } from './appointment.model';
@@ -44,6 +46,28 @@ const INACTIVE_STATUSES = new Set(['cancelled', 'no_show']);
 const RECOMMENDED_ARRIVAL_MINUTES = 10;
 
 const STATUSES_REQUIRING_REASON = new Set(['cancelled', 'no_show']);
+
+// BullMQ rejects custom job IDs containing ':' ("Custom Id cannot contain :") — a dash
+// separator, not a colon.
+function reminderJobId(appointmentId: Types.ObjectId): string {
+  return `appointment-reminder-${appointmentId.toString()}`;
+}
+
+/** Schedules (or reschedules) the SMS/WhatsApp reminder for an appointment's current
+ * windowStart. Silently skips if the reminder time has already passed — best-effort,
+ * never blocks the booking/reschedule flow (enqueueJob itself never throws). */
+async function scheduleReminder(doc: AppointmentDoc): Promise<void> {
+  const jobId = reminderJobId(doc._id);
+  await cancelJob(jobId);
+  const runAt = doc.windowStart.getTime() - env.APPOINTMENT_REMINDER_HOURS_BEFORE * 3_600_000;
+  const delayMs = runAt - Date.now();
+  if (delayMs <= 0) return;
+  await enqueueJob(
+    'appointment-reminder',
+    { appointmentId: doc._id.toString() },
+    { jobId, delayMs },
+  );
+}
 
 function toDto(doc: AppointmentDoc): AppointmentDto {
   const recommendedArrival = new Date(doc.windowStart.getTime() - RECOMMENDED_ARRIVAL_MINUTES * 60_000);
@@ -194,6 +218,8 @@ export async function createAppointment(
     after: { date: doc.date, windowStart: doc.windowStart, windowEnd: doc.windowEnd, doctorId: input.doctorId },
   });
 
+  await scheduleReminder(doc);
+
   return toDto(doc);
 }
 
@@ -279,6 +305,12 @@ export async function rescheduleAppointment(
     after: { date: doc.date, windowStart: doc.windowStart, windowEnd: doc.windowEnd },
   });
 
+  // Reschedule always moves the reminder to the new windowStart — scheduleReminder
+  // cancels any previously-scheduled reminder for this appointment before re-adding.
+  if (!INACTIVE_STATUSES.has(doc.status)) {
+    await scheduleReminder(doc);
+  }
+
   return toDto(doc);
 }
 
@@ -309,6 +341,11 @@ export async function changeAppointmentStatus(
     before: { status: from },
     after: { status: to },
   });
+
+  // A cancelled/no-show appointment no longer needs a reminder.
+  if (INACTIVE_STATUSES.has(to)) {
+    await cancelJob(reminderJobId(doc._id));
+  }
 
   return toDto(doc);
 }

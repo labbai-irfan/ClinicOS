@@ -4,9 +4,11 @@ import { logger } from './shared/logger';
 import { connectDatabase, disconnectDatabase } from './database/connection';
 import { createApp } from './app';
 import { initSocket } from './realtime/socket';
+import { initJobQueue } from './shared/job-queue';
 
 async function main(): Promise<void> {
   await connectDatabase();
+  initJobQueue();
 
   const app = createApp();
   const server = createServer(app);
