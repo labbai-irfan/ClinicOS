@@ -1,6 +1,6 @@
 # ClinicOS — Progress
 
-_Last updated: 2026-07-13 (session 5 — Phase 2 M3 + post-M3 cleanup/clinic-selection)_
+_Last updated: 2026-07-13 (session 5 — Phase 2 M3, cleanup, clinic-selection, M4 reminders)_
 
 ## ✅ COMPLETED — Phase 2 Milestone 2: Patient Portal
 
@@ -299,10 +299,48 @@ clinic picker (user's choice: search/select at signup, over invite-links or manu
   together, many clinics in the database) to confirm this genuinely fixes the cross-clinic
   contamination the old placeholder caused — not just passing in isolation as before
 
-## Next (Phase 2 M4+)
+## ✅ COMPLETED — Phase 2 Milestone 4: SMS/WhatsApp Appointment Reminders
 
-1. **SMS/WhatsApp**: bulk messaging via integration (schema exists from Phase 1)
-2. **Frontend unit tests**: React Testing Library for components
-3. **Advanced analytics**: forecasting, benchmarking, AI dashboards
-4. **Integrations**: pharmacy, lab, hospital referral APIs
-7. **Multi-clinic**: expose org + clinic admin surfaces for managing multiple clinics
+### Scope: Twilio integration, appointment reminders (per user's choice — queue/prescription/billing notifications deferred)
+- Extended the `shared/jobs.ts` facade (scaffolded in Phase 1, never wired up) with
+  jobId/cancel support; new `shared/job-queue.ts` is the real BullMQ producer,
+  registered at API startup, no-ops gracefully without `REDIS_URL` (same convention as
+  every other optional service in this codebase)
+- `appointment.service.ts` schedules a reminder on create, re-schedules on reschedule
+  (cancel + re-add), cancels on cancel/no-show — `APPOINTMENT_REMINDER_HOURS_BEFORE`
+  (default 3) controls timing
+- Worker: Twilio adapter (SMS + WhatsApp), a MongoDB connection + minimal read-only
+  models mirroring apps/api's collections, a new `MessageLogModel` it owns as a
+  send-attempt audit trail, and the `appointment-reminder` job handler (composes a
+  localized message, sends via `APPOINTMENT_REMINDER_CHANNEL`, default `sms`)
+- 206/206 backend tests (4 new, verifying scheduling/cancellation via a fake job backend)
+
+### 2 Real Bugs Found via Live Smoke Test (not caught by unit tests with a fake backend)
+1. **Critical: BullMQ rejects custom job IDs containing `:`.** The original
+   `appointment-reminder:<id>` format silently failed on *every* enqueue attempt —
+   caught by the non-blocking try/catch, so bookings still succeeded, but zero
+   reminders were ever actually scheduled. Only surfaced by running a real BullMQ
+   queue end-to-end (an isolated Redis container, not the shared dev one) instead of
+   trusting the fake-backend unit tests. Fixed to `appointment-reminder-<id>`.
+2. **Doctor name resolved as "your doctor" instead of the real name** — `doctorId` on
+   an appointment can be either a staff profile's own `_id` or the underlying user's
+   `_id` (the same dual-id ambiguity `schedule.service.ts`'s `expandDoctorIds` already
+   resolves API-side); the worker only tried a direct `User` lookup. Fixed with the
+   same fallback resolution (staff profile → `userId` → user).
+
+### Process Note
+Both bugs were invisible to typecheck, unit tests (fake job backend), and code review —
+only a real end-to-end run (isolated Redis + Mongo, a real booked appointment, watching
+the worker actually process the delayed job) surfaced them. Consistent with the M3
+findings: production-integration bugs need production-shaped verification, not just
+mocked-boundary tests.
+
+## Next (Phase 2 M5+)
+
+1. **Frontend unit tests**: React Testing Library for components
+2. **Advanced analytics**: forecasting, benchmarking, AI dashboards
+3. **Integrations**: pharmacy, lab, hospital referral APIs
+4. **Multi-clinic**: expose org + clinic admin surfaces for managing multiple clinics
+5. **More notification triggers**: queue status updates, prescription-ready, billing
+   receipts (schema/infra now exists — extending channel + trigger coverage is
+   incremental from here)
