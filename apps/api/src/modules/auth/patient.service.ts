@@ -4,7 +4,7 @@ import jwt from 'jsonwebtoken';
 import { Types } from 'mongoose';
 import { formatToken } from '@clinicos/config';
 import { env } from '../../config/env';
-import { AppError, ConflictError, UnauthenticatedError } from '../../shared/errors';
+import { AppError, ConflictError, NotFoundError, UnauthenticatedError } from '../../shared/errors';
 import { signAccessToken } from '../../middleware/authenticate';
 import { UserModel, type UserDoc } from '../users/user.model';
 import { ClinicModel } from '../clinics/clinic.model';
@@ -80,15 +80,47 @@ async function issueSession(user: UserDoc, client: ClientInfo, familyId?: string
   return { accessToken, refreshToken, sessionId };
 }
 
+/**
+ * Public clinic search for the registration picker (spec: patient self-signup clinic
+ * selection). Only clinics that have actually finished onboarding are eligible — a
+ * clinic mid-wizard has no branches/doctors/schedules yet, so surfacing it here would
+ * let a patient "join" a clinic that can't yet serve them. No auth; no tenant scope.
+ */
+export async function searchPublicClinics(q?: string): Promise<Array<{ id: string; name: string }>> {
+  const filter: Record<string, unknown> = { isActive: true, onboardingComplete: true, deletedAt: null };
+  if (q) filter.name = { $regex: q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), $options: 'i' };
+
+  const clinics = await ClinicModel.find(filter)
+    .select('_id name')
+    .sort({ name: 1 })
+    .limit(20)
+    .lean();
+
+  return clinics.map((c) => ({ id: c._id.toString(), name: c.name }));
+}
+
 export async function registerPatient(input: {
   name: string;
   email: string;
   phone?: string;
   password: string;
+  clinicId: string;
   client: ClientInfo;
 }): Promise<{ user: UserDoc; tokens: IssuedTokens }> {
   const existing = await UserModel.findOne({ email: input.email.toLowerCase() }).lean();
   if (existing) throw new ConflictError('An account with this email already exists.');
+
+  // Patient-portal endpoints (see patientTenantContext) resolve clinic scope from a
+  // PatientModel record whose _id equals the logged-in user's id — the patient picks
+  // their clinic explicitly at signup (searchPublicClinics powers that picker), so
+  // validate it's a real, onboarded, active clinic before creating anything.
+  const clinic = await ClinicModel.findOne({
+    _id: Types.ObjectId.isValid(input.clinicId) ? new Types.ObjectId(input.clinicId) : null,
+    isActive: true,
+    onboardingComplete: true,
+    deletedAt: null,
+  }).lean();
+  if (!clinic) throw new NotFoundError('Selected clinic was not found. Please pick a clinic from the list.');
 
   const user = await UserModel.create({
     name: input.name,
@@ -97,36 +129,21 @@ export async function registerPatient(input: {
     passwordHash: await hashPassword(input.password),
   });
 
-  // Patient-portal endpoints (see patientTenantContext) resolve clinic scope from a
-  // PatientModel record whose _id equals the logged-in user's id — create that link
-  // now. Self-service sign-up has no clinic-selection step yet, so the new patient is
-  // attached to the single/first active clinic; multi-clinic self-signup (choosing a
-  // clinic, or joining via an invite/QR link) is a follow-up, not covered here.
-  const clinic = await ClinicModel.findOne({ isActive: true, deletedAt: null })
-    .sort({ createdAt: 1 })
-    .lean();
-  if (clinic) {
-    const seq = await nextSequence(`patient:${clinic._id.toString()}`);
-    await PatientModel.create({
-      _id: user._id,
-      organizationId: clinic.organizationId,
-      clinicId: clinic._id,
-      code: formatToken('P', seq, 6),
-      fullName: input.name,
-      gender: 'unknown',
-      mobile: input.phone,
-      email: input.email,
-      emergencyContacts: [],
-      allergies: [],
-      conditions: [],
-      currentMedicines: [],
-    });
-  } else {
-    logger.warn(
-      { userId: user._id.toString() },
-      'patient registered with no active clinic to attach to — patient-portal data endpoints will 404 until one exists',
-    );
-  }
+  const seq = await nextSequence(`patient:${clinic._id.toString()}`);
+  await PatientModel.create({
+    _id: user._id,
+    organizationId: clinic.organizationId,
+    clinicId: clinic._id,
+    code: formatToken('P', seq, 6),
+    fullName: input.name,
+    gender: 'unknown',
+    mobile: input.phone,
+    email: input.email,
+    emergencyContacts: [],
+    allergies: [],
+    conditions: [],
+    currentMedicines: [],
+  });
 
   const tokens = await issueSession(user, input.client);
   return { user, tokens };

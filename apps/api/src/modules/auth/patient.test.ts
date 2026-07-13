@@ -1,11 +1,51 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeAll } from 'vitest';
 import request from 'supertest';
+import { Types } from 'mongoose';
 import { createApp } from '../../app';
 import { UserModel } from '../users/user.model';
+import { ClinicModel } from '../clinics/clinic.model';
+import { createTestClinic } from '../../test/helpers';
 import * as patientAuthService from './patient.service';
 
 describe('Patient Authentication', () => {
   const app = createApp();
+  let clinicId: string;
+
+  beforeAll(async () => {
+    const clinic = await createTestClinic('Patient Auth Test Clinic');
+    clinicId = clinic.clinicId.toString();
+  });
+
+  describe('GET /auth/clinics', () => {
+    it('lists active, onboarded clinics for the registration picker (200)', async () => {
+      const res = await request(app).get('/api/v1/patient/auth/clinics');
+
+      expect(res.status).toBe(200);
+      expect(Array.isArray(res.body.data)).toBe(true);
+      expect(res.body.data.some((c: { id: string }) => c.id === clinicId)).toBe(true);
+    });
+
+    it('filters by name (case-insensitive)', async () => {
+      const res = await request(app)
+        .get('/api/v1/patient/auth/clinics')
+        .query({ q: 'patient auth test' });
+
+      expect(res.status).toBe(200);
+      expect(res.body.data.some((c: { id: string }) => c.id === clinicId)).toBe(true);
+    });
+
+    it('excludes clinics that have not finished onboarding', async () => {
+      const incomplete = await createTestClinic('Incomplete Onboarding Clinic');
+      await ClinicModel.updateOne({ _id: incomplete.clinicId }, { $set: { onboardingComplete: false } });
+
+      const res = await request(app)
+        .get('/api/v1/patient/auth/clinics')
+        .query({ q: 'Incomplete Onboarding' });
+
+      expect(res.status).toBe(200);
+      expect(res.body.data).toHaveLength(0);
+    });
+  });
 
   describe('POST /auth/register-patient', () => {
     it('should register a patient with valid input (201)', async () => {
@@ -16,6 +56,7 @@ describe('Patient Authentication', () => {
           email: `patient-${Date.now()}@test.dev`,
           phone: '+1234567890',
           password: 'SecurePass123',
+          clinicId,
         });
 
       expect(res.status).toBe(201);
@@ -41,6 +82,7 @@ describe('Patient Authentication', () => {
           name: 'New Patient',
           email,
           password: 'SecurePass123',
+          clinicId,
         });
 
       expect(res.status).toBe(409);
@@ -54,6 +96,7 @@ describe('Patient Authentication', () => {
           name: 'John Patient',
           email: `patient-${Date.now()}@test.dev`,
           password: 'weak', // Too short, no uppercase, no number
+          clinicId,
         });
 
       expect(res.status).toBe(400);
@@ -67,9 +110,37 @@ describe('Patient Authentication', () => {
           name: 'John Patient',
           email: 'not-an-email',
           password: 'SecurePass123',
+          clinicId,
         });
 
       expect(res.status).toBe(400);
+      expect(res.body.error).toBeTruthy();
+    });
+
+    it('should return 400 when clinicId is missing', async () => {
+      const res = await request(app)
+        .post('/api/v1/auth/register-patient')
+        .send({
+          name: 'John Patient',
+          email: `patient-noclinic-${Date.now()}@test.dev`,
+          password: 'SecurePass123',
+        });
+
+      expect(res.status).toBe(400);
+      expect(res.body.error).toBeTruthy();
+    });
+
+    it('should return 404 when clinicId does not match a real, active, onboarded clinic', async () => {
+      const res = await request(app)
+        .post('/api/v1/auth/register-patient')
+        .send({
+          name: 'John Patient',
+          email: `patient-badclinic-${Date.now()}@test.dev`,
+          password: 'SecurePass123',
+          clinicId: new Types.ObjectId().toString(),
+        });
+
+      expect(res.status).toBe(404);
       expect(res.body.error).toBeTruthy();
     });
   });

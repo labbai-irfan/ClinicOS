@@ -1,8 +1,27 @@
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import type { ApiSuccess, LoginResponseDto } from '@clinicos/types';
 import type { LoginPatientInput, RegisterPatientInput } from '@clinicos/validation';
 import { patientApiClient } from '../../lib/api-client-patient';
 import { usePatientAuthStore } from '../../stores/auth-store-patient';
+
+export interface PublicClinicOption {
+  id: string;
+  name: string;
+}
+
+/** GET /patient/auth/clinics — public, no auth. Powers the clinic picker at signup. */
+export function useClinicsSearchQuery(q: string) {
+  return useQuery({
+    queryKey: ['auth', 'clinics', q],
+    queryFn: async () => {
+      const { data } = await patientApiClient.get<ApiSuccess<PublicClinicOption[]>>('/auth/clinics', {
+        params: q ? { q } : undefined,
+      });
+      return data.data;
+    },
+    staleTime: 30_000,
+  });
+}
 
 function applyPatientSession(data: LoginResponseDto) {
   usePatientAuthStore.getState().setSession({

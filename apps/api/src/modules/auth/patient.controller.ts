@@ -21,6 +21,12 @@ function isNativeClient(req: Request): boolean {
   return req.headers['x-client-type'] === 'native';
 }
 
+export const searchClinics = asyncHandler(async (req: Request, res: Response): Promise<void> => {
+  const { q } = req.query as { q?: string };
+  const clinics = await patientAuthService.searchPublicClinics(q);
+  ok(res, clinics);
+});
+
 export const registerPatient = asyncHandler(async (req: Request, res: Response): Promise<void> => {
   const { user, tokens } = await patientAuthService.registerPatient({
     ...req.body,

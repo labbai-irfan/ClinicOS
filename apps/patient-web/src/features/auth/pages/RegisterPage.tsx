@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Link, useNavigate } from 'react-router-dom';
@@ -7,11 +8,13 @@ import { Button } from '../../../components/ui/Button';
 import { Input } from '../../../components/ui/Input';
 import { Field } from '../../../components/ui/Field';
 import { apiErrorMessage } from '../../../lib/api-client-patient';
-import { useRegisterPatientMutation } from '../api';
+import { useRegisterPatientMutation, useClinicsSearchQuery } from '../api';
 
 export default function RegisterPage() {
   const navigate = useNavigate();
   const registerPatient = useRegisterPatientMutation();
+  const [clinicQuery, setClinicQuery] = useState('');
+  const clinicsQuery = useClinicsSearchQuery(clinicQuery);
   const {
     register,
     handleSubmit,
@@ -49,6 +52,37 @@ export default function RegisterPage() {
               invalid={!!errors.email}
               {...register('email')}
             />
+          </Field>
+          <Field label="Find your clinic" htmlFor="clinic-search" hint="Search by clinic name">
+            <Input
+              id="clinic-search"
+              type="text"
+              placeholder="e.g. Wellness Clinic"
+              value={clinicQuery}
+              onChange={(e) => setClinicQuery(e.target.value)}
+            />
+          </Field>
+          <Field label="Clinic" htmlFor="clinicId" required error={errors.clinicId?.message}>
+            <select
+              id="clinicId"
+              className="flex h-11 min-h-[44px] w-full items-center rounded border border-border bg-surface px-3 text-sm text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring disabled:cursor-not-allowed disabled:opacity-50"
+              disabled={clinicsQuery.isLoading}
+              defaultValue=""
+              {...register('clinicId')}
+            >
+              <option value="" disabled>
+                {clinicsQuery.isLoading
+                  ? 'Loading clinics…'
+                  : clinicsQuery.data?.length
+                    ? 'Select your clinic'
+                    : 'No clinics found — try a different search'}
+              </option>
+              {clinicsQuery.data?.map((clinic) => (
+                <option key={clinic.id} value={clinic.id}>
+                  {clinic.name}
+                </option>
+              ))}
+            </select>
           </Field>
           <Field label="Phone" htmlFor="phone" error={errors.phone?.message}>
             <Input

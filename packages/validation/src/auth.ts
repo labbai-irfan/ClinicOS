@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { nonEmptyText } from './common';
+import { nonEmptyText, objectId } from './common';
 
 export const passwordSchema = z
   .string()
@@ -43,6 +43,7 @@ export const registerPatientSchema = z.object({
   email: z.string().trim().toLowerCase().email('Enter a valid email'),
   phone: z.string().trim().regex(/^\+?[0-9\s-]{7,15}$/, 'Enter a valid phone number').optional().or(z.literal('').transform(() => undefined)),
   password: passwordSchema,
+  clinicId: objectId,
 });
 export type RegisterPatientInput = z.infer<typeof registerPatientSchema>;
 
@@ -56,3 +57,9 @@ export const refreshPatientSchema = z.object({
   refreshToken: z.string().min(1, 'Refresh token is required'),
 });
 export type RefreshPatientInput = z.infer<typeof refreshPatientSchema>;
+
+/** GET /patient/auth/clinics — public clinic search for the registration picker. */
+export const publicClinicSearchQuery = z.object({
+  q: z.string().trim().max(120).optional(),
+});
+export type PublicClinicSearchQuery = z.infer<typeof publicClinicSearchQuery>;

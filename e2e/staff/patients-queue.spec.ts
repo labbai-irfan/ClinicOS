@@ -273,7 +273,10 @@ test.describe('live queue', () => {
     await page.reload();
     await page.getByRole('button', { name: 'Call Patient' }).click();
     await page.getByRole('button', { name: 'Call Patient' }).click();
-    await expect(page.getByText(/has been called/)).toBeVisible();
+    // Toast title and its visually-hidden aria-live announcer both render this text —
+    // .first() avoids a strict-mode violation (same dual-render pattern as the other
+    // toast assertions in this file).
+    await expect(page.getByText(/has been called/).first()).toBeVisible();
   });
 
   /**

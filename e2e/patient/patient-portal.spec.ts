@@ -3,17 +3,11 @@ import { test, expect } from '@playwright/test';
 /**
  * Patient portal E2E (apps/patient-web, served at baseURL :5174, API at :4000).
  *
- * Backend quirk that shapes this whole file (apps/api/src/modules/auth/patient.service.ts
- * registerPatient): self-service patient sign-up has no clinic-selection step yet, so a
- * newly registered patient is always attached to the single/first *active* clinic in the
- * database (`ClinicModel.findOne({ isActive: true }).sort({ createdAt: 1 })`), never to
- * whichever clinic a test just created. That only lines up with "the clinic we just seeded"
- * when this is the very first clinic ever created against the target database. These tests
- * therefore assume they run against a clean/empty database (as CI normally provides for an
- * E2E job); against a long-lived dev DB with pre-existing clinics, the booking-flow tests
- * will fail because the branch/doctor seeded below won't belong to whatever clinic patients
- * actually resolve to. `describe.serial` + a single `beforeAll` also means every patient
- * registered anywhere in this file lands on the same seeded clinic.
+ * Patients explicitly pick their clinic at registration (GET /patient/auth/clinics powers
+ * a search + <select> on the registration form; registerPatientSchema requires clinicId).
+ * This file seeds one clinic with a doctor + wide-open schedule, then every patient it
+ * registers — via the UI in the golden path, via the API helper elsewhere — is bound to
+ * that specific clinic, independent of how many other clinics exist in the database.
  */
 
 const API = 'http://localhost:4000/api/v1';
@@ -49,6 +43,8 @@ async function apiJson(res: Response) {
 }
 
 interface SeededClinic {
+  clinicId: string;
+  clinicName: string;
   branchName: string;
   doctorName: string;
 }
@@ -59,6 +55,7 @@ interface SeededClinic {
 async function seedClinicWithDoctor(): Promise<SeededClinic> {
   const suffix = uniqueSuffix();
 
+  const clinicName = `E2E Clinic ${suffix}`;
   const ownerData = await apiJson(
     await fetch(`${API}/auth/register-owner`, {
       method: 'POST',
@@ -67,15 +64,30 @@ async function seedClinicWithDoctor(): Promise<SeededClinic> {
         name: 'E2E Owner',
         email: `owner-e2e-${suffix}@clinicos-test.dev`,
         password: 'Password123',
-        clinicName: `E2E Clinic ${suffix}`,
+        clinicName,
       }),
     }),
   );
   const ownerToken: string = ownerData.accessToken;
+  const clinicId: string = ownerData.user.clinicId;
   const authHeaders = {
     'Content-Type': 'application/json',
     Authorization: `Bearer ${ownerToken}`,
   };
+
+  // The public clinic-search picker (GET /patient/auth/clinics) only returns clinics that
+  // have finished onboarding — fast-forward it the same way the other staff-side E2E specs
+  // do, otherwise this seeded clinic would never appear for a patient to select.
+  await apiJson(
+    await fetch(`${API}/clinics/me/onboarding-step`, {
+      method: 'PATCH',
+      headers: authHeaders,
+      body: JSON.stringify({ step: 9 }),
+    }),
+  );
+  await apiJson(
+    await fetch(`${API}/clinics/me/activate`, { method: 'POST', headers: authHeaders }),
+  );
 
   const branches = await apiJson(
     await fetch(`${API}/branches`, { headers: authHeaders }),
@@ -114,15 +126,15 @@ async function seedClinicWithDoctor(): Promise<SeededClinic> {
     }),
   );
 
-  return { branchName: branch.name, doctorName };
+  return { clinicId, clinicName, branchName: branch.name, doctorName };
 }
 
-async function registerPatientViaApi(email: string, password: string, name: string) {
+async function registerPatientViaApi(email: string, password: string, name: string, clinicId: string) {
   return apiJson(
     await fetch(`${API}/patient/auth/register-patient`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, email, password }),
+      body: JSON.stringify({ name, email, password, clinicId }),
     }),
   );
 }
@@ -149,6 +161,12 @@ test.describe('Patient portal', () => {
     await page.goto('/register');
     await page.getByLabel('Your name').fill(patientName);
     await page.getByLabel('Email').fill(patientEmail);
+    await page.getByLabel('Find your clinic').fill(seeded.clinicName);
+    // Field renders a trailing "*" for required fields, so the real accessible name is
+    // "Clinic*" (exact:true — plain "Clinic" would also substring-match the search
+    // field's own "Find your clinic" label).
+    await expect(page.getByLabel('Clinic*', { exact: true })).toBeEnabled();
+    await page.getByLabel('Clinic*', { exact: true }).selectOption({ label: seeded.clinicName });
     await page.getByLabel('Password').fill('Password123');
     await page.getByRole('button', { name: 'Create Account' }).click();
 
@@ -195,11 +213,14 @@ test.describe('Patient portal', () => {
   test('duplicate email registration shows an error', async ({ page }) => {
     const suffix = uniqueSuffix();
     const email = `dup-e2e-${suffix}@clinicos-test.dev`;
-    await registerPatientViaApi(email, 'Password123', 'Original Patient');
+    await registerPatientViaApi(email, 'Password123', 'Original Patient', seeded.clinicId);
 
     await page.goto('/register');
     await page.getByLabel('Your name').fill('Second Patient');
     await page.getByLabel('Email').fill(email);
+    await page.getByLabel('Find your clinic').fill(seeded.clinicName);
+    await expect(page.getByLabel('Clinic*', { exact: true })).toBeEnabled();
+    await page.getByLabel('Clinic*', { exact: true }).selectOption({ label: seeded.clinicName });
     await page.getByLabel('Password').fill('Password123');
     await page.getByRole('button', { name: 'Create Account' }).click();
 
@@ -211,7 +232,7 @@ test.describe('Patient portal', () => {
   test('booking is blocked until a doctor is selected', async ({ page }) => {
     const suffix = uniqueSuffix();
     const email = `nodoctorbooking-e2e-${suffix}@clinicos-test.dev`;
-    await registerPatientViaApi(email, 'Password123', 'No Doctor Patient');
+    await registerPatientViaApi(email, 'Password123', 'No Doctor Patient', seeded.clinicId);
 
     await page.goto('/login');
     await page.getByLabel('Email').fill(email);
@@ -232,7 +253,7 @@ test.describe('Patient portal', () => {
   test('logout redirects to /login', async ({ page }) => {
     const suffix = uniqueSuffix();
     const email = `logout-e2e-${suffix}@clinicos-test.dev`;
-    await registerPatientViaApi(email, 'Password123', 'Logout Patient');
+    await registerPatientViaApi(email, 'Password123', 'Logout Patient', seeded.clinicId);
 
     await page.goto('/login');
     await page.getByLabel('Email').fill(email);
