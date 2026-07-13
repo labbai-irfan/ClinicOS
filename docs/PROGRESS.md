@@ -1,6 +1,6 @@
 # ClinicOS — Progress
 
-_Last updated: 2026-07-13 (session 5 — Phase 2 M3 completion)_
+_Last updated: 2026-07-13 (session 5 — Phase 2 M3 + post-M3 cleanup/clinic-selection)_
 
 ## ✅ COMPLETED — Phase 2 Milestone 2: Patient Portal
 
@@ -271,20 +271,38 @@ See `docs/DEPLOYMENT.md`:
 3. **Critical: patient dashboard crashed with "Maximum update depth exceeded"** immediately after every patient login/registration. `HeaderPatient` used a Zustand selector returning a new object literal every render (`(s) => ({ name: s.name, email: s.email })`), which never compares equal under Zustand's reference-equality check — infinite re-render loop. Fixed by splitting into two primitive selectors.
 4. **Medium: skipped/temporarily-away queue entries vanish from the board with no way back.** `GET /queues?view=board` only returns `QUEUE_BOARD_COLUMNS` statuses, which excludes `skipped`/`temporarily_away` — so the frontend's "Needs attention" section (built specifically to show these) could never receive any data; a skipped patient effectively disappeared from the queue with no Rejoin path. Fixed by widening the board query to include both statuses alongside the Kanban columns.
 
-### Known Limitation (not fixed — real feature work, out of scope for E2E)
-- **Patient self-registration has no clinic-selection step.** `registerPatient` attaches every new patient to "whichever active clinic was created first" in the database (documented in `patient.service.ts`'s own comments). This is fine with exactly one clinic in the database but breaks in any multi-clinic environment — which the E2E database always is once more than one spec file has run. The `patient-portal.spec.ts` booking test fails downstream of this (wrong doctor list) when run alongside the full suite; it passes in isolation. Needs a real clinic-selection UX at patient signup (or invite-link-based clinic binding) — tracked as a Phase 2 backlog item, not patched around here.
-
 ### Process Notes (for future E2E/workflow runs)
 - A background workflow agent asked to "smoke test" via `npm run dev:api` hung indefinitely and was silently retried 4 times — dev servers never exit, so any agent instructed to run one directly (instead of letting Playwright's `webServer` manage it) will hang. Fixed by rewriting that stage to static verification only.
 - `reuseExistingServer: true` (Playwright's default outside CI) trusts *anything* listening on the configured port, not just this project — a completely unrelated app on the same developer machine using Vite's default port (5173) silently hijacked an entire E2E run with zero errors, just wrong results across all 34 tests. Fixed by moving E2E to dedicated, non-default ports (5273/5274) with `--strictPort` so a future collision fails loudly instead of testing the wrong app.
 - Chaining CLI flags through nested `npm run` scripts (`npm run dev:web -- --port X`) silently drops them instead of forwarding to the underlying command — `playwright.config.ts` now invokes `vite` directly with an explicit `cwd` instead.
 
+## ✅ COMPLETED — Post-M3 Follow-ups
+
+### Cleanup: apps/patient-web dead code
+Traced the real import graph from `main.tsx` and removed 139 files left over from M2's
+"copy apps/web and adapt" approach (the entire staff feature set — admin, billing,
+clinical, emergency, queue, onboarding, documents, notifications, reports, patients
+directory — was never actually wired into the patient app's router). `apps/patient-web/src`
+shrinks from ~190 files to 40. Found and fixed one real regression along the way: 6 pages
+imported shared UI components from a barrel file that the initial trace misidentified as
+unused (bare-directory import resolution gap in the tracing script) — fixed by importing
+each component directly instead of restoring the barrel. Verified via typecheck, production
+build, and the full patient E2E suite before and after.
+
+### Patient self-registration clinic-selection
+Replaced the "attach to whichever clinic was created first" placeholder with an explicit
+clinic picker (user's choice: search/select at signup, over invite-links or manual codes):
+- `GET /patient/auth/clinics?q=` — public clinic search, only returns active/onboarded clinics
+- `registerPatientSchema` now requires `clinicId`; the service validates it's real (404 if not)
+- RegisterPage adds a clinic name search + `<select>` of matches
+- 5 new backend tests (202/202 total); E2E re-verified against the full suite (staff + patient
+  together, many clinics in the database) to confirm this genuinely fixes the cross-clinic
+  contamination the old placeholder caused — not just passing in isolation as before
+
 ## Next (Phase 2 M4+)
 
 1. **SMS/WhatsApp**: bulk messaging via integration (schema exists from Phase 1)
 2. **Frontend unit tests**: React Testing Library for components
-3. **Patient clinic-selection**: fix the self-registration "first active clinic" limitation noted above
-4. **Cleanup**: remove ~150 unused staff-feature files accidentally copied into `apps/patient-web` during M2 (verified dead — not in the shipped bundle — but should be deleted for repo hygiene)
-5. **Advanced analytics**: forecasting, benchmarking, AI dashboards
-6. **Integrations**: pharmacy, lab, hospital referral APIs
+3. **Advanced analytics**: forecasting, benchmarking, AI dashboards
+4. **Integrations**: pharmacy, lab, hospital referral APIs
 7. **Multi-clinic**: expose org + clinic admin surfaces for managing multiple clinics
