@@ -46,7 +46,8 @@ const clinicSettingsSchema = new Schema<ClinicSettingsDoc>(
   { collection: 'clinicSettings' },
 );
 
-tenantBase(clinicSettingsSchema, { branch: false });
+// indexClinic: false — the unique index below is the single index on clinicId.
+tenantBase(clinicSettingsSchema, { branch: false, indexClinic: false });
 
 clinicSettingsSchema.index({ clinicId: 1 }, { unique: true });
 
@@ -82,7 +83,8 @@ const tokenSettingsSchema = new Schema<TokenSettingsDoc>(
   { collection: 'tokenSettings' },
 );
 
-tenantBase(tokenSettingsSchema);
+// indexBranch: false — the unique index below is the single index on branchId.
+tenantBase(tokenSettingsSchema, { indexBranch: false });
 
 tokenSettingsSchema.index({ branchId: 1 }, { unique: true });
 

@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch --env-file-if-exists=../../.env src/server.ts",
+    "seed:demo": "tsx --env-file-if-exists=../../.env src/scripts/seed-demo.ts",
     "build": "esbuild src/server.ts --bundle --platform=node --format=esm --target=node20 --outfile=dist/server.mjs --packages=external",
     "start": "node --env-file-if-exists=../../.env dist/server.mjs",
     "typecheck": "tsc --noEmit -p tsconfig.json",

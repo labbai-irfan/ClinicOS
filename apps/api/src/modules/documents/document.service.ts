@@ -64,7 +64,16 @@ function ensureCloudinaryConfigured(): void {
 function uploadToCloudinary(buffer: Buffer, folder: string): Promise<UploadApiResponse> {
   return new Promise((resolve, reject) => {
     const stream = cloudinary.uploader.upload_stream(
-      { resource_type: 'auto', folder, type: 'authenticated' },
+      {
+        resource_type: 'auto',
+        folder,
+        type: 'authenticated',
+        // Keep the original filename as the base of the public id (Cloudinary still
+        // appends a short random suffix so re-uploads never overwrite each other),
+        // so assets are readable in the Media Library instead of opaque ids.
+        use_filename: true,
+        unique_filename: true,
+      },
       (error?: UploadApiErrorResponse, result?: UploadApiResponse) => {
         if (error || !result) {
           reject(error ?? new Error('Cloudinary upload failed'));
@@ -77,8 +86,13 @@ function uploadToCloudinary(buffer: Buffer, folder: string): Promise<UploadApiRe
   });
 }
 
-function folderFor(clinicId: Types.ObjectId, patientId: string): string {
-  return 'clinicos/' + clinicId.toString() + '/patients/' + patientId;
+/**
+ * Deterministic, human-readable folder path so every asset lives in a predictable
+ * place — `clinicos/<clinicId>/patients/<patientId>/<category>` — instead of a random
+ * location. New categories automatically get their own subfolder.
+ */
+function folderFor(clinicId: Types.ObjectId, patientId: string, category: DocumentCategory): string {
+  return `clinicos/${clinicId.toString()}/patients/${patientId}/${category}`;
 }
 
 export async function uploadDocument(
@@ -88,7 +102,10 @@ export async function uploadDocument(
   input: UploadInput,
 ): Promise<DocumentDoc> {
   ensureCloudinaryConfigured();
-  const result = await uploadToCloudinary(file.buffer, folderFor(tenant.clinicId, input.patientId));
+  const result = await uploadToCloudinary(
+    file.buffer,
+    folderFor(tenant.clinicId, input.patientId, input.category),
+  );
 
   return DocumentModel.create({
     organizationId: tenant.organizationId,
@@ -159,7 +176,10 @@ export async function replaceDocument(
 ): Promise<DocumentDoc> {
   ensureCloudinaryConfigured();
   const previous = await getByIdOrThrow(tenant, id);
-  const result = await uploadToCloudinary(file.buffer, folderFor(tenant.clinicId, previous.patientId.toString()));
+  const result = await uploadToCloudinary(
+    file.buffer,
+    folderFor(tenant.clinicId, previous.patientId.toString(), input.category),
+  );
 
   const next = await DocumentModel.create({
     organizationId: tenant.organizationId,

@@ -1,7 +1,8 @@
+import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Stethoscope } from 'lucide-react';
+import { Eye, EyeOff, Stethoscope } from 'lucide-react';
 import { loginSchema, type LoginInput } from '@clinicos/validation';
 import { Button } from '../../../components/ui/Button';
 import { Input } from '../../../components/ui/Input';
@@ -13,6 +14,7 @@ export default function LoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const login = useLoginMutation();
+  const [showPassword, setShowPassword] = useState(false);
   const {
     register,
     handleSubmit,
@@ -50,13 +52,29 @@ export default function LoginPage() {
             />
           </Field>
           <Field label="Password" htmlFor="password" required error={errors.password?.message}>
-            <Input
-              id="password"
-              type="password"
-              autoComplete="current-password"
-              invalid={!!errors.password}
-              {...register('password')}
-            />
+            <div className="relative">
+              <Input
+                id="password"
+                type={showPassword ? 'text' : 'password'}
+                autoComplete="current-password"
+                invalid={!!errors.password}
+                className="pr-10"
+                {...register('password')}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword((v) => !v)}
+                className="absolute inset-y-0 right-0 flex items-center px-3 text-text-secondary hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring rounded"
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
+                tabIndex={-1}
+              >
+                {showPassword ? (
+                  <EyeOff className="h-5 w-5" aria-hidden="true" />
+                ) : (
+                  <Eye className="h-5 w-5" aria-hidden="true" />
+                )}
+              </button>
+            </div>
           </Field>
 
           {errors.root?.message && (

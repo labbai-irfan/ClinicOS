@@ -16,6 +16,7 @@
     "dev:patient-web": "npm run dev --workspace=apps/patient-web",
     "dev:api": "npm run dev --workspace=apps/api",
     "dev:worker": "npm run dev --workspace=apps/worker",
+    "seed:demo": "npm run seed:demo --workspace=apps/api",
     "build": "npm run build --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "lint": "eslint .",

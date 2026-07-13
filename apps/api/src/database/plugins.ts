@@ -13,6 +13,16 @@ export interface TenantFields {
 interface TenantBaseOptions {
   /** Set false for clinic-level documents that are not branch-scoped. */
   branch?: boolean;
+  /**
+   * Set false when the schema declares its own (e.g. unique) index on `clinicId`,
+   * so the plugin doesn't add a duplicate plain index on the same field.
+   */
+  indexClinic?: boolean;
+  /**
+   * Set false when the schema declares its own (e.g. unique) index on `branchId`,
+   * so the plugin doesn't add a duplicate plain index on the same field.
+   */
+  indexBranch?: boolean;
 }
 
 /**
@@ -23,10 +33,14 @@ interface TenantBaseOptions {
 export function tenantBase(schema: Schema, options: TenantBaseOptions = {}): void {
   schema.add({
     organizationId: { type: MongooseSchema.Types.ObjectId, required: true, index: true },
-    clinicId: { type: MongooseSchema.Types.ObjectId, required: true, index: true },
+    clinicId: {
+      type: MongooseSchema.Types.ObjectId,
+      required: true,
+      index: options.indexClinic !== false,
+    },
     ...(options.branch === false
       ? {}
-      : { branchId: { type: MongooseSchema.Types.ObjectId, index: true } }),
+      : { branchId: { type: MongooseSchema.Types.ObjectId, index: options.indexBranch !== false } }),
     deletedAt: { type: Date, default: null },
   });
   schema.set('timestamps', true);
