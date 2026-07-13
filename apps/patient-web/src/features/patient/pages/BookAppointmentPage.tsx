@@ -4,7 +4,11 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { format } from 'date-fns';
 import { Calendar } from 'lucide-react';
 import { z } from 'zod';
-import { Button, Card, Field, Input, PageHeader } from '../../../components/ui';
+import { Button } from '../../../components/ui/Button';
+import { Card } from '../../../components/ui/Card';
+import { Field } from '../../../components/ui/Field';
+import { Input } from '../../../components/ui/Input';
+import { PageHeader } from '../../../components/ui/PageHeader';
 import { toast } from '../../../components/ui/Toast';
 import { apiErrorMessage } from '../../../lib/api-client-patient';
 import {

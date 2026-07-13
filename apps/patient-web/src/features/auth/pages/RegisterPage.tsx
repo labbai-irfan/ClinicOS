@@ -6,7 +6,7 @@ import { registerPatientSchema, type RegisterPatientInput } from '@clinicos/vali
 import { Button } from '../../../components/ui/Button';
 import { Input } from '../../../components/ui/Input';
 import { Field } from '../../../components/ui/Field';
-import { apiErrorMessage } from '../../../lib/api-client';
+import { apiErrorMessage } from '../../../lib/api-client-patient';
 import { useRegisterPatientMutation } from '../api';
 
 export default function RegisterPage() {

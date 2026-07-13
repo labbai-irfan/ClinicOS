@@ -1,7 +1,9 @@
 import { useMemo, useState } from 'react';
 import { format, parseISO } from 'date-fns';
 import { Download, FileText } from 'lucide-react';
-import { Button, Card, PageHeader } from '../../../components/ui';
+import { Button } from '../../../components/ui/Button';
+import { Card } from '../../../components/ui/Card';
+import { PageHeader } from '../../../components/ui/PageHeader';
 import { QueryBoundary } from '../../../components/QueryBoundary';
 import { EmptyState } from '../../../components/ui/EmptyState';
 import { StatusPill } from '../../../components/ui/StatusPill';
