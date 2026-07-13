@@ -11,7 +11,13 @@ const THEME_ICON = { system: MonitorSmartphone, light: Sun, dark: Moon } as cons
 const THEME_LABEL = { system: 'System theme (click for light)', light: 'Light theme (click for dark)', dark: 'Dark theme (click for system)' } as const;
 
 export function HeaderPatient({ onOpenMobileNav }: { onOpenMobileNav: () => void }) {
-  const { name, email } = usePatientAuthStore((s) => ({ name: s.name, email: s.email }));
+  // Two separate primitive selectors, not one selector returning a new object literal —
+  // Zustand's default equality check is reference equality, so an inline object selector
+  // (`(s) => ({ name: s.name, email: s.email })`) returns a fresh reference on every call
+  // and never compares equal to its previous result, causing an infinite render loop
+  // ("Maximum update depth exceeded") the moment this component mounts.
+  const name = usePatientAuthStore((s) => s.name);
+  const email = usePatientAuthStore((s) => s.email);
   const logout = usePatientAuthStore((s) => s.logout);
   const navigate = useNavigate();
   const { theme, cycleTheme } = useThemeToggle();

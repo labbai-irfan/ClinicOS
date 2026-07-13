@@ -20,7 +20,11 @@ export function getIo(): Server | null {
  */
 export function initSocket(server: HttpServer): Server {
   io = new Server(server, {
-    cors: { origin: env.WEB_ORIGIN, credentials: true },
+    // WEB_ORIGIN may be a comma-separated list (e.g. staff app + patient portal on
+    // different ports) — split it the same way app.ts's Express cors() middleware does,
+    // otherwise Socket.IO tries to exact-match the raw, un-split string against the
+    // browser's single Origin header and rejects every connection.
+    cors: { origin: env.WEB_ORIGIN.split(',').map((o) => o.trim()), credentials: true },
   });
 
   io.on('connection', async (socket) => {

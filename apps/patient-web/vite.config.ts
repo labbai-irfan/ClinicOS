@@ -10,7 +10,7 @@ export default defineConfig({
     },
   },
   server: {
-    port: 5173,
+    port: 5174,
     // Capacitor's WebView loads the built app from a native shell — during native
     // development the dev server must still be reachable from a device/emulator.
     host: true,

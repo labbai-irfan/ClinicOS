@@ -46,13 +46,13 @@ API_BASE_URL=http://localhost:4000
 - **Where to get**: Just set it yourself based on your deployment target
 
 ```
-WEB_ORIGIN=http://localhost:5173
+WEB_ORIGIN=http://localhost:5173,http://localhost:5174
 ```
-- **What**: URL of the web app (CORS allow-list)
-- **For local dev**: `http://localhost:5173` (Vite default)
-- **For production**: Your deployed web domain (e.g., `https://app.clinicos.com`)
-- **Supports multiple**: Comma-separate for multiple origins: `https://app.com,https://mobile.app.com`
-- **Where to get**: Just set it yourself
+- **What**: URL(s) of the web app(s) (CORS allow-list)
+- **For local dev**: `http://localhost:5173,http://localhost:5174` — the staff app (5173) *and* the patient portal (5174); both are separate origins and both need to be listed or the patient app's API calls are silently blocked by CORS
+- **For production**: Your deployed web domains (e.g., `https://app.clinicos.com,https://patient.clinicos.com`)
+- **Supports multiple**: Comma-separated, no spaces around the comma needed (trimmed automatically)
+- **Where to get**: Just set it yourself — but if you add a new frontend app on a new port/domain, remember to add it here too
 
 ---
 
@@ -298,7 +298,7 @@ VITE_API_URL=http://localhost:4000
 NODE_ENV=development
 PORT=4000
 API_BASE_URL=http://localhost:4000
-WEB_ORIGIN=http://localhost:5173
+WEB_ORIGIN=http://localhost:5173,http://localhost:5174
 
 # Database
 MONGODB_URI=mongodb://127.0.0.1:27017/clinicos
@@ -328,6 +328,10 @@ LOCKOUT_MAX_ATTEMPTS=5
 LOCKOUT_DURATION_MINUTES=15
 
 # ========== FRONTEND (apps/web) ==========
+
+VITE_API_URL=http://localhost:4000
+
+# ========== PATIENT PORTAL (apps/patient-web) ==========
 
 VITE_API_URL=http://localhost:4000
 ```

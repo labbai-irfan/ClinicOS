@@ -40,10 +40,16 @@ export function useQueueBoardQuery(date: string, view: QueueBoardView = 'board')
   const query = useQuery({
     queryKey,
     queryFn: async () => {
-      const { data } = await apiClient.get<ApiSuccess<QueueEntryDto[]>>('/queues', {
-        params: { view, date },
-      });
-      return data.data;
+      const { data } = await apiClient.get<ApiSuccess<QueueEntryDto[] | Record<string, QueueEntryDto[]>>>(
+        '/queues',
+        { params: { view, date } },
+      );
+      const payload = data.data;
+      // GET /queues?view=list replies with a flat array, but GET /queues?view=board
+      // (queue.controller.ts `list()`) replies with entries grouped by board column
+      // (Record<QueueBoardColumn, QueueEntryDto[]>) — flatten so every consumer of this
+      // hook can treat the result as a plain QueueEntryDto[] regardless of view.
+      return Array.isArray(payload) ? payload : Object.values(payload).flat();
     },
     refetchInterval: 15_000,
   });

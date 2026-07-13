@@ -1,6 +1,6 @@
 # ClinicOS — Progress
 
-_Last updated: 2026-07-13 (session 4 — Phase 2 M2 completion)_
+_Last updated: 2026-07-13 (session 5 — Phase 2 M3 completion)_
 
 ## ✅ COMPLETED — Phase 2 Milestone 2: Patient Portal
 
@@ -247,12 +247,44 @@ See `docs/DEPLOYMENT.md`:
 - No new docs needed; all APIs documented in docs/API_DOCUMENTATION.md
 - Phase 1 docs still valid (architecture, decisions, deployment, security, RBAC matrix)
 
-## Next (Phase 2 M2+)
+## ✅ COMPLETED — Phase 2 Milestone 3: E2E Test Suite
 
-1. **Patient portal**: self-service booking, prescription viewing, appointment history (new role: patient)
-2. **E2E tests**: Playwright flows for golden-path + edge cases
-3. **SMS/WhatsApp**: bulk messaging via integration (schema exists from Phase 1)
-4. **Frontend unit tests**: React Testing Library for components
-6. **Advanced analytics**: forecasting, benchmarking, AI dashboards
-7. **Integrations**: pharmacy, lab, hospital referral APIs
-8. **Multi-clinic**: expose org + clinic admin surfaces for managing multiple clinics
+### Scope: Playwright coverage across the staff app and patient portal, plus 4 real production bugs found and fixed along the way
+- **38 E2E tests** across 9 spec files (8 staff-app domains + 1 patient-portal domain)
+- **32/33 executable tests passing** (1 intentionally `test.fixme` pending a documented backend limitation; 4 tests in a `describe.serial` block don't run after their preceding test fails — see below)
+- Root `playwright.config.ts`: two projects (`staff`, `patient`), auto-managed `webServer` array (API + both web apps), isolated E2E-only ports (5273/5274) and a dedicated `clinicos_e2e` database dropped before every run
+
+### Coverage
+- **auth-onboarding**: registration, 9-step wizard, duplicate email, weak password, wrong login
+- **patients-queue**: walk-in registration (no age required), duplicate warning, validation, directory search, Kanban board flow, skip/rejoin
+- **clinical**: nurse assessment → doctor consultation → finalized prescription, validation guards, role-based access denial
+- **billing**: multi-item invoice, payment, daily closing, RBAC-gated discount/refund, overpayment rejection, refund reason requirement
+- **emergency**: quick-register (no identity) → triage → assign → observe, queue isolation, referral validation, timeline immutability
+- **admin**: staff invite, branch creation, weekly schedule, role permission edit, owner-permission lock, search/filter, validation
+- **documents-notifications**: upload/list/download, file-type and size validation, notification badge state
+- **display**: public waiting-room screen (no login), PII exclusion, malformed-branch-id handling
+- **patient-portal**: registration, login, booking, prescriptions, logout, protected-route redirects
+
+### 4 Real Production Bugs Found and Fixed (not test bugs — verified via direct reproduction)
+1. **Critical: patient portal completely broken in real browsers.** `WEB_ORIGIN` only allowlisted the staff app's origin (`:5173`); the patient app (`:5174`) was silently blocked by CORS on every single API call (`withCredentials: true` + disallowed origin = browser blocks it). M2's verification never caught this because it deliberately avoided live browser testing. Fixed: `WEB_ORIGIN` now lists both origins in `.env`/`.env.example`/docs.
+2. **Critical: Socket.IO realtime broken for both apps** after fix #1 — `apps/api/src/realtime/socket.ts` passed the raw, un-split `WEB_ORIGIN` string to Socket.IO's CORS config, while Express's CORS middleware already split it into an array. A comma-joined string can never match a browser's single-origin header, so adding the second origin (fix #1) broke realtime entirely until this was caught. Fixed to split identically to `app.ts`.
+3. **Critical: patient dashboard crashed with "Maximum update depth exceeded"** immediately after every patient login/registration. `HeaderPatient` used a Zustand selector returning a new object literal every render (`(s) => ({ name: s.name, email: s.email })`), which never compares equal under Zustand's reference-equality check — infinite re-render loop. Fixed by splitting into two primitive selectors.
+4. **Medium: skipped/temporarily-away queue entries vanish from the board with no way back.** `GET /queues?view=board` only returns `QUEUE_BOARD_COLUMNS` statuses, which excludes `skipped`/`temporarily_away` — so the frontend's "Needs attention" section (built specifically to show these) could never receive any data; a skipped patient effectively disappeared from the queue with no Rejoin path. Fixed by widening the board query to include both statuses alongside the Kanban columns.
+
+### Known Limitation (not fixed — real feature work, out of scope for E2E)
+- **Patient self-registration has no clinic-selection step.** `registerPatient` attaches every new patient to "whichever active clinic was created first" in the database (documented in `patient.service.ts`'s own comments). This is fine with exactly one clinic in the database but breaks in any multi-clinic environment — which the E2E database always is once more than one spec file has run. The `patient-portal.spec.ts` booking test fails downstream of this (wrong doctor list) when run alongside the full suite; it passes in isolation. Needs a real clinic-selection UX at patient signup (or invite-link-based clinic binding) — tracked as a Phase 2 backlog item, not patched around here.
+
+### Process Notes (for future E2E/workflow runs)
+- A background workflow agent asked to "smoke test" via `npm run dev:api` hung indefinitely and was silently retried 4 times — dev servers never exit, so any agent instructed to run one directly (instead of letting Playwright's `webServer` manage it) will hang. Fixed by rewriting that stage to static verification only.
+- `reuseExistingServer: true` (Playwright's default outside CI) trusts *anything* listening on the configured port, not just this project — a completely unrelated app on the same developer machine using Vite's default port (5173) silently hijacked an entire E2E run with zero errors, just wrong results across all 34 tests. Fixed by moving E2E to dedicated, non-default ports (5273/5274) with `--strictPort` so a future collision fails loudly instead of testing the wrong app.
+- Chaining CLI flags through nested `npm run` scripts (`npm run dev:web -- --port X`) silently drops them instead of forwarding to the underlying command — `playwright.config.ts` now invokes `vite` directly with an explicit `cwd` instead.
+
+## Next (Phase 2 M4+)
+
+1. **SMS/WhatsApp**: bulk messaging via integration (schema exists from Phase 1)
+2. **Frontend unit tests**: React Testing Library for components
+3. **Patient clinic-selection**: fix the self-registration "first active clinic" limitation noted above
+4. **Cleanup**: remove ~150 unused staff-feature files accidentally copied into `apps/patient-web` during M2 (verified dead — not in the shipped bundle — but should be deleted for repo hygiene)
+5. **Advanced analytics**: forecasting, benchmarking, AI dashboards
+6. **Integrations**: pharmacy, lab, hospital referral APIs
+7. **Multi-clinic**: expose org + clinic admin surfaces for managing multiple clinics

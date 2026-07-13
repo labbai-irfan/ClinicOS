@@ -338,9 +338,18 @@ export interface BoardQuery {
   doctorId?: string;
 }
 
+// The web app's "Needs attention" section (QueueBoardPage.tsx's attentionEntries memo)
+// filters the flattened board response for these two statuses — they aren't Kanban
+// columns, but they must still be present in the response or that section can never
+// show anything (a skipped/temporarily-away entry would silently vanish from the board
+// entirely, with no route back to Rejoin, since the frontend has no other source of
+// queue data on this page).
+const ATTENTION_STATUSES = ['skipped', 'temporarily_away'] as const;
+const BOARD_QUERY_STATUSES: readonly QueueStatus[] = [...QUEUE_BOARD_COLUMNS, ...ATTENTION_STATUSES];
+
 export interface BoardResult {
   date: string;
-  columns: Record<(typeof QUEUE_BOARD_COLUMNS)[number], QueueEntryDoc[]>;
+  columns: Partial<Record<QueueStatus, QueueEntryDoc[]>>;
 }
 
 /** GET /queues?view=board — Kanban columns, sorted priority desc then position/arrival asc. */
@@ -350,7 +359,7 @@ export async function getBoard(tenant: TenantScope, query: BoardQuery): Promise<
     clinicId: tenant.clinicId,
     branchId: tenant.branchId,
     date,
-    status: { $in: QUEUE_BOARD_COLUMNS },
+    status: { $in: BOARD_QUERY_STATUSES },
     deletedAt: null,
   };
   if (query.doctorId) filter.doctorId = toObjectId(query.doctorId);
@@ -364,9 +373,9 @@ export async function getBoard(tenant: TenantScope, query: BoardQuery): Promise<
     return aTime - bTime;
   });
 
-  const columns = Object.fromEntries(QUEUE_BOARD_COLUMNS.map((col) => [col, [] as QueueEntryDoc[]])) as BoardResult['columns'];
+  const columns = Object.fromEntries(BOARD_QUERY_STATUSES.map((col) => [col, [] as QueueEntryDoc[]])) as BoardResult['columns'];
   for (const entry of entries) {
-    columns[entry.status as (typeof QUEUE_BOARD_COLUMNS)[number]]?.push(entry);
+    columns[entry.status as QueueStatus]?.push(entry);
   }
 
   return { date, columns };
